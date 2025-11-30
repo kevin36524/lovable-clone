@@ -1,4 +1,4 @@
-import { generateCodeWithClaude } from "./generateWithClaudeCode";
+import { generateCodeWithClaude } from "./generateWithClaudeCode.ts";
 
 async function testClaudeCodeSDK() {
   console.log("Testing Claude Code SDK by generating a Tic-Tac-Toe game...\n");
@@ -20,9 +20,9 @@ async function testClaudeCodeSDK() {
     console.log(`Total messages: ${result.messages.length}`);
     
     // Log summary of actions taken
-    const toolUses = result.messages.filter(m => m.type === 'tool_use');
-    console.log(`\nTool uses: ${toolUses.length}`);
-    toolUses.forEach((msg: any) => {
+    const toolProgress = result.messages.filter(m => m.type === 'tool_progress');
+    console.log(`\nTool progress events: ${toolProgress.length}`);
+    toolProgress.forEach((msg: any) => {
       console.log(`- ${msg.name} ${msg.input?.file_path || ''}`);
     });
   } else {
