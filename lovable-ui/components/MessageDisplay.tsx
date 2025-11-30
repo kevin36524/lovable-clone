@@ -1,4 +1,4 @@
-import { type SDKMessage } from "@anthropic-ai/claude-code";
+import { type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { useState, useEffect } from "react";
 
 interface MessageDisplayProps {

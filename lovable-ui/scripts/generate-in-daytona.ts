@@ -59,10 +59,10 @@ async function generateWebsiteInDaytona(
     await sandbox.process.executeCommand("npm init -y", projectDir);
     console.log("✓ Package.json created");
 
-    // Step 4: Install Claude Code SDK locally in project
-    console.log("\n4. Installing Claude Code SDK locally...");
+    // Step 4: Install Claude Agent SDK locally in project
+    console.log("\n4. Installing Claude Agent SDK locally...");
     const installResult = await sandbox.process.executeCommand(
-      "npm install @anthropic-ai/claude-code@latest",
+      "npm install @anthropic-ai/claude-agent-sdk@latest",
       projectDir,
       undefined,
       180000 // 3 minute timeout
@@ -70,14 +70,14 @@ async function generateWebsiteInDaytona(
 
     if (installResult.exitCode !== 0) {
       console.error("Installation failed:", installResult.result);
-      throw new Error("Failed to install Claude Code SDK");
+      throw new Error("Failed to install Claude Agent SDK");
     }
-    console.log("✓ Claude Code SDK installed");
+    console.log("✓ Claude Agent SDK installed");
 
     // Verify installation
     console.log("\n5. Verifying installation...");
     const checkInstall = await sandbox.process.executeCommand(
-      "ls -la node_modules/@anthropic-ai/claude-code",
+      "ls -la node_modules/@anthropic-ai/claude-agent-sdk",
       projectDir
     );
     console.log("Installation check:", checkInstall.result);
@@ -85,19 +85,24 @@ async function generateWebsiteInDaytona(
     // Step 6: Create the generation script file
     console.log("\n6. Creating generation script file...");
 
-    const generationScript = `const { query } = require('@anthropic-ai/claude-code');
+    const generationScript = `const { query } = require('@anthropic-ai/claude-agent-sdk');
 const fs = require('fs');
+const path = require('path');
 
 async function generateWebsite() {
+  const currentDir = process.cwd();
   const prompt = \`${
     prompt ||
     "Create a modern blog website with markdown support and a dark theme"
   }
-  
+
+  IMPORTANT: All file paths must be absolute paths starting with: ${projectDir}
+
   Important requirements:
   - Create a NextJS app with TypeScript and Tailwind CSS
   - Use the app directory structure
-  - Create all files in the current directory
+  - Create all files in: ${projectDir}
+  - Use absolute paths like: ${projectDir}/app/page.tsx, ${projectDir}/package.json
   - Include a package.json with all necessary dependencies
   - Make the design modern and responsive
   - Add at least a home page and one other page
