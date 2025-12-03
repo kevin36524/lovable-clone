@@ -18,12 +18,16 @@ interface Message {
 export default function GeneratePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const prompt = searchParams.get("prompt") || "";
-  
+  const templateName = searchParams.get("templateName") || "";
+  const gitBranch = searchParams.get("gitBranch") || "";
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [sandboxId, setSandboxId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userQuery, setUserQuery] = useState("");
+  const [isQueryProcessing, setIsQueryProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
   
@@ -36,35 +40,36 @@ export default function GeneratePage() {
   }, [messages]);
   
   useEffect(() => {
-    if (!prompt) {
+    // Check if we have template info
+    if (!templateName) {
       router.push("/");
       return;
     }
-    
+
     // Prevent double execution in StrictMode
     if (hasStartedRef.current) {
       return;
     }
     hasStartedRef.current = true;
-    
+
     setIsGenerating(true);
-    generateWebsite();
+    deployE2BSandbox();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prompt, router]);
+  }, [templateName, router]);
   
-  const generateWebsite = async () => {
+  const deployE2BSandbox = async () => {
     try {
-      const response = await fetch("/api/generate-daytona", {
+      const response = await fetch("/api/deploy-e2b", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ templateName, gitBranch }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate website");
+        throw new Error(errorData.error || "Failed to deploy sandbox");
       }
 
       const reader = response.body?.getReader();
@@ -92,11 +97,12 @@ export default function GeneratePage() {
 
             try {
               const message = JSON.parse(data) as Message;
-              
+
               if (message.type === "error") {
                 throw new Error(message.message);
               } else if (message.type === "complete") {
                 setPreviewUrl(message.previewUrl || null);
+                setSandboxId(message.sandboxId || null);
                 setIsGenerating(false);
               } else {
                 setMessages((prev) => [...prev, message]);
@@ -108,9 +114,84 @@ export default function GeneratePage() {
         }
       }
     } catch (err: any) {
-      console.error("Error generating website:", err);
+      console.error("Error deploying sandbox:", err);
       setError(err.message || "An error occurred");
       setIsGenerating(false);
+    }
+  };
+
+  const handleQuerySubmit = async () => {
+    if (!userQuery.trim() || !sandboxId || isQueryProcessing) return;
+
+    setIsQueryProcessing(true);
+    const query = userQuery;
+    setUserQuery("");
+
+    // Add user message to chat
+    setMessages((prev) => [...prev, {
+      type: "claude_message",
+      content: `User: ${query}`
+    }]);
+
+    try {
+      // TODO: Implement Claude Code agent execution in sandbox
+      // This will call an API endpoint that runs Claude Code agent with the query
+      const response = await fetch("/api/execute-query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sandboxId, query }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to execute query");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+
+            if (data === "[DONE]") {
+              break;
+            }
+
+            try {
+              const message = JSON.parse(data) as Message;
+
+              if (message.type === "error") {
+                throw new Error(message.message);
+              } else {
+                setMessages((prev) => [...prev, message]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Error executing query:", err);
+      setMessages((prev) => [...prev, {
+        type: "error",
+        message: err.message || "Failed to execute query"
+      }]);
+    } finally {
+      setIsQueryProcessing(false);
     }
   };
   
@@ -154,7 +235,9 @@ export default function GeneratePage() {
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-white font-semibold">Lovable</h2>
-            <p className="text-gray-400 text-sm mt-1 break-words">{prompt}</p>
+            <p className="text-gray-400 text-sm mt-1 break-words">
+              {templateName ? `Template: ${templateName}` : "Setting up..."}
+            </p>
           </div>
           
           {/* Messages */}
@@ -211,19 +294,33 @@ export default function GeneratePage() {
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Ask Lovable..."
-                className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg border border-gray-800 focus:outline-none focus:border-gray-700"
-                disabled={isGenerating}
+                placeholder={previewUrl ? "Ask Claude to modify your app..." : "Waiting for sandbox..."}
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleQuerySubmit();
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg border border-gray-800 focus:outline-none focus:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!previewUrl || isQueryProcessing}
               />
-              <button className="p-2 text-gray-400 hover:text-gray-300">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-300">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+              <button
+                onClick={handleQuerySubmit}
+                disabled={!previewUrl || !userQuery.trim() || isQueryProcessing}
+                className="p-2 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isQueryProcessing ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>

@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
 export default function Home() {
   const router = useRouter();
-  const [prompt, setPrompt] = useState("");
 
-  const handleGenerate = () => {
-    if (!prompt.trim()) return;
-
-    // Navigate to generate page with prompt
-    router.push(`/generate?prompt=${encodeURIComponent(prompt)}`);
+  const handleTemplateSelection = (templateName: string, gitBranch?: string) => {
+    const params = new URLSearchParams({
+      templateName,
+      ...(gitBranch && { gitBranch })
+    });
+    router.push(`/generate?${params.toString()}`);
   };
 
   return (
@@ -38,112 +37,90 @@ export default function Home() {
           </h3>
 
           <p className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            Turn your ideas into production-ready code in minutes. Powered by
-            Claude's advanced AI capabilities.
+            Choose a template to start building your application
           </p>
 
-          {/* Input Section */}
-          <div className="relative max-w-2xl mx-auto">
-            <div className="relative flex items-center bg-black rounded-2xl border border-gray-800 shadow-2xl px-2">
-              {/* Textarea */}
-              <textarea
-                placeholder="Ask Lovable to create a prototype..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGenerate();
-                  }
-                }}
-                className="flex-1 px-5 py-4 bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg resize-none min-h-[120px] max-h-[300px]"
-                rows={3}
-              />
+          {/* Template Selection Buttons */}
+          <div className="relative max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Blank App */}
+              <button
+                onClick={() => handleTemplateSelection('blank-app')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Blank App</h3>
+                  <p className="text-gray-400 text-sm">Start with a clean Next.js application</p>
+                </div>
+              </button>
 
-              {/* Send button */}
+              {/* App with Mastra */}
               <button
-                onClick={handleGenerate}
-                disabled={!prompt.trim()}
-                className="flex-shrink-0 mr-3 p-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
+                onClick={() => handleTemplateSelection('app-with-mastra')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
               >
-                {false ? (
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                ) : (
-                  <svg
-                    className="h-5 w-5 group-hover:scale-110 transition-transform"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 10l7-7m0 0l7 7m-7-7v18"
-                    />
-                  </svg>
-                )}
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">App with Mastra</h3>
+                  <p className="text-gray-400 text-sm">Next.js app with Mastra AI integration</p>
+                </div>
               </button>
-            </div>
 
-            {/* Example prompts */}
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              {/* App with Mail and Mastra */}
               <button
-                onClick={() =>
-                  setPrompt(
-                    "Create a modern blog website with markdown support"
-                  )
-                }
-                className="px-4 py-2 text-sm text-gray-400 bg-gray-800/50 backdrop-blur-sm rounded-full hover:bg-gray-700/50 transition-colors border border-gray-700"
+                onClick={() => handleTemplateSelection('app-with-mail-mastra')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/10"
               >
-                Blog website
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-green-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-green-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">App with Mail & Mastra</h3>
+                  <p className="text-gray-400 text-sm">Full-featured app with email and AI</p>
+                </div>
               </button>
+
+              {/* Joke App */}
               <button
-                onClick={() =>
-                  setPrompt("Build a portfolio website with project showcase")
-                }
-                className="px-4 py-2 text-sm text-gray-400 bg-gray-800/50 backdrop-blur-sm rounded-full hover:bg-gray-700/50 transition-colors border border-gray-700"
+                onClick={() => handleTemplateSelection('hack-skeleton-joke')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10"
               >
-                Portfolio site
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-yellow-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Joke App</h3>
+                  <p className="text-gray-400 text-sm">Fun skeleton joke application</p>
+                </div>
               </button>
+
+              {/* From Git Branch */}
               <button
-                onClick={() =>
-                  setPrompt(
-                    "Create an e-commerce product catalog with shopping cart"
-                  )
-                }
-                className="px-4 py-2 text-sm text-gray-400 bg-gray-800/50 backdrop-blur-sm rounded-full hover:bg-gray-700/50 transition-colors border border-gray-700"
+                onClick={() => handleTemplateSelection('from-git-branch', 'main')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/10"
               >
-                E-commerce
-              </button>
-              <button
-                onClick={() =>
-                  setPrompt(
-                    "Build a dashboard with charts and data visualization"
-                  )
-                }
-                className="px-4 py-2 text-sm text-gray-400 bg-gray-800/50 backdrop-blur-sm rounded-full hover:bg-gray-700/50 transition-colors border border-gray-700"
-              >
-                Dashboard
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-orange-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">From Git Branch</h3>
+                  <p className="text-gray-400 text-sm">Load from a specific Git branch</p>
+                </div>
               </button>
             </div>
           </div>
