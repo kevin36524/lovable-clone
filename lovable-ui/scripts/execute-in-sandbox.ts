@@ -1,29 +1,26 @@
-import { Daytona } from "@daytonaio/sdk";
+import { Sandbox } from "@e2b/code-interpreter";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
 // Load environment variables
-dotenv.config({ path: path.join(__dirname, "../../.env") });
+dotenv.config({ path: path.join(__dirname, "../.env") });
 
 async function executeInSandbox(
   sandboxId: string,
   command: string,
   workingDir?: string
 ) {
-  if (!process.env.DAYTONA_API_KEY) {
-    console.error("ERROR: DAYTONA_API_KEY must be set");
+  if (!process.env.E2B_API_KEY) {
+    console.error("ERROR: E2B_API_KEY must be set");
     process.exit(1);
   }
 
-  const daytona = new Daytona({
-    apiKey: process.env.DAYTONA_API_KEY,
-  });
+  let sandbox: Sandbox | null = null;
 
   try {
-    // Get the sandbox
+    // Connect to the sandbox
     console.log(`Connecting to sandbox: ${sandboxId}`);
-    const sandboxes = await daytona.list();
-    const sandbox = sandboxes.find((s: any) => s.id === sandboxId);
+    sandbox = await Sandbox.connect(sandboxId);
 
     if (!sandbox) {
       throw new Error(`Sandbox ${sandboxId} not found`);
@@ -31,21 +28,29 @@ async function executeInSandbox(
 
     console.log(`✓ Connected to sandbox`);
 
-    // Get root directory if not specified
-    const rootDir = workingDir || (await sandbox.getUserRootDir());
-    console.log(`Working directory: ${rootDir}`);
+    // Working directory is not needed in E2b, but we can use it in the command if specified
+    if (workingDir) {
+      console.log(`Working directory: ${workingDir}`);
+    }
 
     // Execute command
     console.log(`\nExecuting: ${command}\n`);
-    const result = await sandbox.process.executeCommand(
-      command,
-      rootDir,
-      undefined,
-      600000 // 10 minute timeout
+    const result = await sandbox.commands.run(
+      workingDir ? `cd ${workingDir} && ${command}` : command,
+      {
+        timeoutMs: 600000, // 10 minutes
+        onStdout: (data) => console.log(data),
+        onStderr: (data) => console.error(data)
+      }
     );
 
     console.log("=== OUTPUT ===");
-    console.log(result.result);
+    console.log(result.stdout);
+
+    if (result.stderr) {
+      console.log("=== STDERR ===");
+      console.log(result.stderr);
+    }
 
     if (result.exitCode !== 0) {
       console.log(`\nExit code: ${result.exitCode}`);
@@ -56,6 +61,10 @@ async function executeInSandbox(
   } catch (error: any) {
     console.error("❌ ERROR:", error.message);
     process.exit(1);
+  } finally {
+    if (sandbox) {
+      await sandbox.close();
+    }
   }
 }
 

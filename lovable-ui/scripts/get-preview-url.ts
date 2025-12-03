@@ -1,4 +1,4 @@
-import { Daytona } from "@daytonaio/sdk";
+import { Sandbox } from "@e2b/code-interpreter";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
@@ -6,40 +6,33 @@ import * as path from "path";
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
 async function getPreviewUrl(sandboxId: string, port: number = 3000) {
-  if (!process.env.DAYTONA_API_KEY) {
-    console.error("ERROR: DAYTONA_API_KEY must be set");
+  if (!process.env.E2B_API_KEY) {
+    console.error("ERROR: E2B_API_KEY must be set");
     process.exit(1);
   }
 
-  const daytona = new Daytona({
-    apiKey: process.env.DAYTONA_API_KEY,
-  });
+  let sandbox: Sandbox | null = null;
 
   try {
-    // Get sandbox
-    const sandboxes = await daytona.list();
-    const sandbox = sandboxes.find((s: any) => s.id === sandboxId);
-    
-    if (!sandbox) {
-      throw new Error(`Sandbox ${sandboxId} not found`);
-    }
+    // Connect to sandbox
+    sandbox = await Sandbox.connect(sandboxId);
 
     console.log(`✓ Found sandbox: ${sandboxId}`);
 
     // Get preview URL
-    const preview = await sandbox.getPreviewLink(port);
-    
+    const previewUrl = sandbox.getHost(port);
+
     console.log("\n🌐 Preview URL:");
-    console.log(preview.url);
-    
-    if (preview.token) {
-      console.log(`\n🔑 Access Token: ${preview.token}`);
-    }
-    
-    return preview.url;
+    console.log(previewUrl);
+
+    return previewUrl;
   } catch (error: any) {
     console.error("Failed to get preview URL:", error.message);
     process.exit(1);
+  } finally {
+    if (sandbox) {
+      await sandbox.close();
+    }
   }
 }
 

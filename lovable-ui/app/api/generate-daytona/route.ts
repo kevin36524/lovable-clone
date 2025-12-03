@@ -5,22 +5,22 @@ import path from "path";
 export async function POST(req: NextRequest) {
   try {
     const { prompt } = await req.json();
-    
+
     if (!prompt) {
       return new Response(
         JSON.stringify({ error: "Prompt is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
-    
-    if (!process.env.DAYTONA_API_KEY || !process.env.ANTHROPIC_API_KEY) {
+
+    if (!process.env.E2B_API_KEY || !process.env.ANTHROPIC_API_KEY) {
       return new Response(
         JSON.stringify({ error: "Missing API keys" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-    
-    console.log("[API] Starting Daytona generation for prompt:", prompt);
+
+    console.log("[API] Starting E2b generation for prompt:", prompt);
     
     // Create a streaming response
     const encoder = new TextEncoder();
@@ -30,12 +30,12 @@ export async function POST(req: NextRequest) {
     // Start the async generation
     (async () => {
       try {
-        // Use the generate-in-daytona.ts script
+        // Use the generate-in-daytona.ts script (now uses E2b internally)
         const scriptPath = path.join(process.cwd(), "scripts", "generate-in-daytona.ts");
         const child = spawn("npx", ["tsx", scriptPath, prompt], {
           env: {
             ...process.env,
-            DAYTONA_API_KEY: process.env.DAYTONA_API_KEY,
+            E2B_API_KEY: process.env.E2B_API_KEY,
             ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
           },
         });
@@ -126,14 +126,14 @@ export async function POST(req: NextRequest) {
         // Capture stderr
         child.stderr.on("data", async (data) => {
           const error = data.toString();
-          console.error("[Daytona Error]:", error);
-          
+          console.error("[E2b Error]:", error);
+
           // Only send actual errors, not debug info
           if (error.includes("Error") || error.includes("Failed")) {
             await writer.write(
-              encoder.encode(`data: ${JSON.stringify({ 
-                type: "error", 
-                message: error.trim() 
+              encoder.encode(`data: ${JSON.stringify({
+                type: "error",
+                message: error.trim()
               })}\n\n`)
             );
           }

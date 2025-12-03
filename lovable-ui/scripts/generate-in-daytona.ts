@@ -1,147 +1,110 @@
-import { Daytona } from "@daytonaio/sdk";
+import { Sandbox } from "@e2b/code-interpreter";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
-async function generateWebsiteInDaytona(
+async function generateWebsiteInE2b(
   sandboxIdArg?: string,
   prompt?: string
 ) {
-  console.log("🚀 Starting website generation in Daytona sandbox...\n");
+  console.log("🚀 Starting website generation in E2b sandbox...\n");
 
-  if (!process.env.DAYTONA_API_KEY || !process.env.ANTHROPIC_API_KEY) {
-    console.error("ERROR: DAYTONA_API_KEY and ANTHROPIC_API_KEY must be set");
+  if (!process.env.E2B_API_KEY || !process.env.ANTHROPIC_API_KEY) {
+    console.error("ERROR: E2B_API_KEY and ANTHROPIC_API_KEY must be set");
     process.exit(1);
   }
 
-  const daytona = new Daytona({
-    apiKey: process.env.DAYTONA_API_KEY,
-  });
-
-  let sandbox;
+  let sandbox: Sandbox | null = null;
   let sandboxId = sandboxIdArg;
 
   try {
-    // Step 1: Create or get volume
-    console.log("1. Setting up shared volume...");
-    const volume = await daytona.volume.get("hack-volume", { create: true });
-    console.log(`✓ Volume ready: ${volume.id}`);
-
-    // Step 2: Create or get sandbox
+    // Step 1: Create or connect to sandbox
     if (sandboxId) {
-      console.log(`2. Using existing sandbox: ${sandboxId}`);
-      // Get existing sandbox
-      const sandboxes = await daytona.list();
-      sandbox = sandboxes.find((s: any) => s.id === sandboxId);
-      if (!sandbox) {
+      console.log(`1. Connecting to existing sandbox: ${sandboxId}`);
+      try {
+        sandbox = await Sandbox.connect(sandboxId);
+        console.log(`✓ Connected to sandbox: ${sandbox.sandboxId}`);
+      } catch (err) {
         throw new Error(`Sandbox ${sandboxId} not found`);
       }
-      console.log(`✓ Connected to sandbox: ${sandbox.id}`);
     } else {
-      console.log("2. Creating new Daytona sandbox...");
-      sandbox = await daytona.create({
-        public: true,
-        image: "node:latest",
-        volumes: [
-          {
-            volumeId: volume.id,
-            mountPath: "/hack-volume"
-          }
-        ],
-        resources: {
-          memory: 2, // 2GB memory
-          disk: 8 // 8GB disk
-        },
-        autoDeleteInterval: 120
-      });
-      sandboxId = sandbox.id;
+      console.log("1. Creating new E2b sandbox...");
+      sandbox = await Sandbox.create();
+      sandboxId = sandbox.sandboxId;
       console.log(`✓ Sandbox created: ${sandboxId}`);
     }
 
-    // Get the root directory
-    const rootDir = await sandbox.getUserRootDir();
-    console.log(`✓ Working directory: ${rootDir}`);
-
-    // Step 3: Clone hack-skeleton-app
-    console.log("\n3. Cloning hack-skeleton-app...");
-    const cloneResult = await sandbox.process.executeCommand(
-      "cp -r /hack-volume/website-project.tgz . ; tar -xzf website-project.tgz ; rm website-project.tgz",
-      rootDir,
-      undefined,
-      60000 // 1 minute timeout
+    // Step 2: Extract project files
+    console.log("\n2. Extracting project files...");
+    const extractResult = await sandbox.commands.exec(
+      "cp -r /hack-volume/website-project.tgz . ; tar -xzf website-project.tgz ; rm website-project.tgz"
     );
 
-    const projectDir = `${rootDir}/website-project`;
-    
-    // Step 4: Set up .env file
-    console.log("\n4. Setting up .env file...");
+    if (extractResult.exitCode !== 0) {
+      console.error("Extraction error:", extractResult.stderr);
+    }
+
+    const projectDir = `website-project`;
+
+    // Step 3: Set up .env file
+    console.log("\n3. Setting up .env file...");
     const envContent = `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`;
-    await sandbox.process.executeCommand(
+    await sandbox.commands.exec(
       `cat > .env << 'EOF'
 ${envContent}
-EOF`,
-      projectDir
+EOF`
     );
     console.log("✓ .env file created");
 
-    // Step 5: Check generated files
-    console.log("\n5. Checking project files...");
-    const filesResult = await sandbox.process.executeCommand(
-      "ls -la",
-      projectDir
-    );
-    console.log(filesResult.result);
+    // Step 4: Check generated files
+    console.log("\n4. Checking project files...");
+    const filesResult = await sandbox.commands.exec("ls -la");
+    console.log(filesResult.stdout);
 
-    // Step 6: Start dev server in background
-    console.log("\n6. Starting development server in background...");
-      // Start the server in background using nohup
-      await sandbox.process.executeCommand(
-        `nohup npm run dev > dev-server.log 2>&1 &`,
-        projectDir,
-        { PORT: "3000" }
-      );
+    // Step 5: Start dev server in background
+    console.log("\n5. Starting development server in background...");
+    // Start the server in background using nohup
+    await sandbox.commands.exec(
+      `nohup npm run dev > dev-server.log 2>&1 &`
+    );
 
     console.log("✓ Server started in background");
 
     // Wait a bit for server to initialize
-    console.log("\n7. Waiting for server to start...");
+    console.log("\n6. Waiting for server to start...");
     await new Promise((resolve) => setTimeout(resolve, 8000));
 
     // Check if server is running
-    const checkServer = await sandbox.process.executeCommand(
-      "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo 'failed'",
-      projectDir
+    const checkServer = await sandbox.commands.exec(
+      "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo 'failed'"
     );
 
-    if (checkServer.result?.trim() === '200') {
+    if (checkServer.stdout?.trim() === '200') {
       console.log("✓ Server is running!");
     } else {
       console.log("⚠️  Server might still be starting...");
       console.log("You can check logs with: cat dev-server.log");
     }
 
-    // Step 8: Get preview URL
-    console.log("\n8. Getting preview URL...");
-    const preview = await sandbox.getPreviewLink(3000);
+    // Step 7: Get preview URL
+    console.log("\n7. Getting preview URL...");
+    const previewUrl = sandbox.getHost(3000);
 
     console.log("\n✨ SUCCESS! Website generated!");
     console.log("\n📊 SUMMARY:");
     console.log("===========");
     console.log(`Sandbox ID: ${sandboxId}`);
     console.log(`Project Directory: ${projectDir}`);
-    console.log(`Preview URL: ${preview.url}`);
-    if (preview.token) {
-      console.log(`Access Token: ${preview.token}`);
-    }
+    console.log(`Preview URL: ${previewUrl}`);
 
     console.log("\n🌐 VISIT YOUR WEBSITE:");
-    console.log(preview.url);
+    console.log(previewUrl);
 
     console.log("\n💡 TIPS:");
     console.log("- The sandbox will stay active for debugging");
-    console.log("- Server logs: SSH in and run 'cat website-project/dev-server.log'");
+    console.log("- Server logs: Run 'cat website-project/dev-server.log'");
     console.log(
       `- To get preview URL again: npx tsx scripts/get-preview-url.ts ${sandboxId}`
     );
@@ -150,11 +113,15 @@ EOF`,
     );
     console.log(`- To remove: npx tsx scripts/remove-sandbox.ts ${sandboxId}`);
 
+    if (sandbox) {
+      await sandbox.close();
+    }
+
     return {
       success: true,
       sandboxId: sandboxId,
       projectDir: projectDir,
-      previewUrl: preview.url,
+      previewUrl: previewUrl,
     };
   } catch (error: any) {
     console.error("\n❌ ERROR:", error.message);
@@ -165,12 +132,12 @@ EOF`,
 
       // Try to get debug info
       try {
-        const debugInfo = await sandbox.process.executeCommand(
-          "pwd && echo '---' && ls -la && echo '---' && test -f generate.js && cat generate.js | head -20 || echo 'No script'",
-          `${await sandbox.getUserRootDir()}/website-project`
-        );
+        const debugInfo = await sandbox.commands.exec({
+          command: "pwd && echo '---' && ls -la && echo '---' && test -f generate.js && cat generate.js | head -20 || echo 'No script'",
+          timeout: 10,
+        });
         console.log("\nDebug info:");
-        console.log(debugInfo.result);
+        console.log(debugInfo.stdout);
       } catch (e) {
         // Ignore
       }
@@ -188,9 +155,9 @@ async function main() {
 
   // Parse arguments
   if (args.length > 0) {
-    // Check if first arg is a sandbox ID (UUID format)
+    // Check if first arg is a sandbox ID (UUID-like format)
     const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      /^[a-z0-9-]{20,}$/i;
     if (uuidRegex.test(args[0])) {
       sandboxId = args[0];
       prompt = args.slice(1).join(" ");
@@ -212,7 +179,7 @@ async function main() {
   console.log();
 
   try {
-    await generateWebsiteInDaytona(sandboxId, prompt);
+    await generateWebsiteInE2b(sandboxId, prompt);
   } catch (error) {
     console.error("Failed to generate website:", error);
     process.exit(1);
