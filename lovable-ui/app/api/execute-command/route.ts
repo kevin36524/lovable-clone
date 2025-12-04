@@ -4,11 +4,18 @@ import path from "path";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sandboxId, query } = await req.json();
+    const { sandboxId, commandType, query } = await req.json();
 
-    if (!sandboxId || !query) {
+    if (!sandboxId || !commandType || !query) {
       return new Response(
-        JSON.stringify({ error: "Sandbox ID and query are required" }),
+        JSON.stringify({ error: "Sandbox ID, command type, and query are required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (commandType !== "shell" && commandType !== "ai") {
+      return new Response(
+        JSON.stringify({ error: "Command type must be 'shell' or 'ai'" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -20,7 +27,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("[API] Executing query in sandbox:", sandboxId);
+    console.log("[API] Executing command in sandbox:", sandboxId);
+    console.log("[API] Command type:", commandType);
     console.log("[API] Query:", query);
 
     // Create a streaming response
@@ -34,8 +42,19 @@ export async function POST(req: NextRequest) {
         // Use the execute-in-sandbox.ts script
         const scriptPath = path.join(process.cwd(), "scripts", "execute-in-sandbox.ts");
 
-        // Pass sandbox ID and query as arguments
-        const child = spawn("npx", ["tsx", scriptPath, sandboxId, query], {
+        // Prepare command based on type
+        let command: string;
+        if (commandType === "ai") {
+          // For AI commands, use npm run feature with the user query
+          command = `npm run feature -- "${query}"`;
+        } else {
+          // For shell commands, use the query directly
+          command = query;
+        }
+
+        // Pass sandbox ID, command, and working directory as arguments
+        const workingDir = "/home/user/app";
+        const child = spawn("npx", ["tsx", scriptPath, sandboxId, command, workingDir], {
           env: {
             ...process.env,
             E2B_API_KEY: process.env.E2B_API_KEY,

@@ -71,23 +71,6 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
       console.log(`✅ Set ${Object.keys(envVars).length} environment variables`)
     }
 
-    // Install dependencies
-    console.log('\n📥 Installing dependencies (this may take a while)...')
-    const installResult = await sandbox.commands.run(
-      'cd /home/user/app && npm install',
-      {
-        timeoutMs: 600000, // 10 minutes
-        onStdout: (data) => console.log(data),
-        onStderr: (data) => console.error(data)
-      }
-    )
-
-    if (installResult.exitCode !== 0) {
-      throw new Error(`npm install failed with exit code ${installResult.exitCode}`)
-    }
-
-    console.log('✅ Dependencies installed successfully')
-
     // Start Next.js
     console.log('\n🌐 Starting Next.js server on port 3000...')
     await sandbox.commands.run(

@@ -28,6 +28,7 @@ export default function GeneratePage() {
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
   const [isQueryProcessing, setIsQueryProcessing] = useState(false);
+  const [commandMode, setCommandMode] = useState<"shell" | "ai">("ai");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
   
@@ -134,14 +135,13 @@ export default function GeneratePage() {
     }]);
 
     try {
-      // TODO: Implement Claude Code agent execution in sandbox
-      // This will call an API endpoint that runs Claude Code agent with the query
-      const response = await fetch("/api/execute-query", {
+      // Use the selected command mode
+      const response = await fetch("/api/execute-command", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ sandboxId, query }),
+        body: JSON.stringify({ sandboxId, commandType: commandMode, query }),
       });
 
       if (!response.ok) {
@@ -234,7 +234,7 @@ export default function GeneratePage() {
         <div className="w-[30%] flex flex-col border-r border-gray-800">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-white font-semibold">Lovable</h2>
+            <h2 className="text-white font-semibold">Hackable</h2>
             <p className="text-gray-400 text-sm mt-1 break-words">
               {templateName ? `Template: ${templateName}` : "Setting up..."}
             </p>
@@ -248,9 +248,9 @@ export default function GeneratePage() {
                   <div className="bg-gray-900 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">L</span>
+                        <span className="text-white text-xs">H</span>
                       </div>
-                      <span className="text-white font-medium">Lovable</span>
+                      <span className="text-white font-medium">Hackable</span>
                     </div>
                     <p className="text-gray-300 whitespace-pre-wrap break-words">{message.content}</p>
                   </div>
@@ -291,10 +291,40 @@ export default function GeneratePage() {
           
           {/* Bottom input area */}
           <div className="p-4 border-t border-gray-800">
+            {/* Mode switcher */}
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setCommandMode("ai")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  commandMode === "ai"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                AI Mode
+              </button>
+              <button
+                onClick={() => setCommandMode("shell")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  commandMode === "shell"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                Shell Mode
+              </button>
+            </div>
+
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder={previewUrl ? "Ask Claude to modify your app..." : "Waiting for sandbox..."}
+                placeholder={
+                  !previewUrl
+                    ? "Waiting for sandbox..."
+                    : commandMode === "ai"
+                    ? "Ask Claude to modify your app..."
+                    : "Enter shell command (e.g., ls, npm run dev)..."
+                }
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
                 onKeyDown={(e) => {

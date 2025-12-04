@@ -9,9 +9,9 @@ export default function Navbar() {
           href="/"
           className="flex items-center gap-2 text-2xl font-semibold text-white hover:opacity-90 transition-opacity"
         >
-          {/* Simple gradient square to mimic Lovable logo */}
+          {/* Simple gradient square logo */}
           <span className="inline-block w-6 h-6 rounded-sm bg-gradient-to-br from-orange-400 via-pink-500 to-blue-500" />
-          Lovable
+          Hackable
         </a>
 
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-300">
