@@ -15,6 +15,7 @@ interface DeploymentConfig {
   envVars?: Record<string, string>;
   waitTimeout?: number;
   healthCheckRetries?: number;
+  gitBranch?: string;
 }
 
 interface DeploymentResult {
@@ -33,7 +34,8 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     templateName,
     envVars = {},
     waitTimeout = 60000,
-    healthCheckRetries = 15
+    healthCheckRetries = 15,
+    gitBranch
   } = config
 
   console.log('🚀 Starting deployment...')
@@ -82,6 +84,23 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       await sandbox.commands.run(
         `cd /home/user/app && ./scripts/git_ops.sh setupGh ${process.env.GITHUB_TOKEN}`
       )
+    }
+
+    // Switch to git branch if specified
+    if (gitBranch) {
+      console.log(`\n🔀 Switching to git branch: ${gitBranch}...`)
+      const gitResult = await sandbox.commands.run(
+        `cd /home/user/app && ./scripts/git_ops.sh fetchAndSwitch ${gitBranch}`,
+        {
+          onStdout: (data) => { process.stdout.write(data); },
+          onStderr: (data) => { process.stderr.write(data); }
+        }
+      )
+
+      if (gitResult.exitCode !== 0) {
+        throw new Error(`Failed to switch to branch ${gitBranch}: ${gitResult.stderr}`)
+      }
+      console.log(`✅ Switched to branch: ${gitBranch}`)
     }
 
     // Start Next.js

@@ -1,10 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
 export default function Home() {
   const router = useRouter();
+  const [showGitBranchModal, setShowGitBranchModal] = useState(false);
+  const [gitBranchInput, setGitBranchInput] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lastGitBranchName") || "";
+    }
+    return "";
+  });
 
   const handleTemplateSelection = (templateName: string, gitBranch?: string) => {
     const params = new URLSearchParams({
@@ -12,6 +20,19 @@ export default function Home() {
       ...(gitBranch && { gitBranch })
     });
     router.push(`/generate?${params.toString()}`);
+  };
+
+  const handleGitBranchSubmit = () => {
+    if (!gitBranchInput.trim()) return;
+
+    const branchWithPrefix = `e2b/${gitBranchInput.trim()}`;
+
+    // Save to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lastGitBranchName", gitBranchInput.trim());
+    }
+
+    handleTemplateSelection('from-git-branch', branchWithPrefix);
   };
 
   return (
@@ -109,7 +130,7 @@ export default function Home() {
 
               {/* From Git Branch */}
               <button
-                onClick={() => handleTemplateSelection('from-git-branch', 'main')}
+                onClick={() => setShowGitBranchModal(true)}
                 className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/10"
               >
                 <div className="flex flex-col items-center text-center">
@@ -126,6 +147,58 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Git Branch Modal */}
+      {showGitBranchModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+            <h3 className="text-white text-lg font-semibold mb-4">Load from Git Branch</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Branch Name
+                  <span className="text-gray-600 ml-2">(e2b/ prefix will be added)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="feature-name"
+                  value={gitBranchInput}
+                  onChange={(e) => setGitBranchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && gitBranchInput.trim()) {
+                      handleGitBranchSubmit();
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-600"
+                  autoFocus
+                />
+                {gitBranchInput && (
+                  <p className="text-gray-500 text-xs mt-1">
+                    Will load from: e2b/{gitBranchInput}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowGitBranchModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-800 text-gray-400 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGitBranchSubmit}
+                disabled={!gitBranchInput.trim()}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Load Branch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes blob {

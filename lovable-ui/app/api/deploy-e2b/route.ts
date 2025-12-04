@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("[API] Starting E2B deployment for template:", templateName);
+    if (gitBranch) {
+      console.log("[API] Will switch to git branch:", gitBranch);
+    }
 
     // Create a streaming response
     const encoder = new TextEncoder();
@@ -89,7 +92,8 @@ export async function POST(req: NextRequest) {
               NODE_ENV: 'development',
             },
             waitTimeout: 60000,
-            healthCheckRetries: 20
+            healthCheckRetries: 20,
+            gitBranch
           });
 
           // Restore console before final logging

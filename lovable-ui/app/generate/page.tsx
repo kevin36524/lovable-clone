@@ -33,6 +33,15 @@ export default function GeneratePage() {
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [showMastra, setShowMastra] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showGitModal, setShowGitModal] = useState(false);
+  const [gitBranchName, setGitBranchName] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lastGitBranchName") || "";
+    }
+    return "";
+  });
+  const [gitCommitMessage, setGitCommitMessage] = useState("");
+  const [isGitSaving, setIsGitSaving] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
@@ -164,6 +173,90 @@ export default function GeneratePage() {
       message: "AI session cleared. Next command will start a new session."
     }]);
     console.log("AI session cleared");
+  };
+
+  const handleGitSave = async () => {
+    if (!gitBranchName.trim() || !gitCommitMessage.trim() || !sandboxId) return;
+
+    setIsGitSaving(true);
+    const branchWithPrefix = `e2b/${gitBranchName.trim()}`;
+
+    setMessages((prev) => [...prev, {
+      type: "progress",
+      message: `Saving to git: branch=${branchWithPrefix}, message="${gitCommitMessage}"`
+    }]);
+
+    try {
+      const response = await fetch("/api/execute-command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxId,
+          commandType: "shell",
+          query: `./scripts/git_ops.sh commitAndPush ${branchWithPrefix} "${gitCommitMessage}"`
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to execute git save");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+
+            if (data === "[DONE]") {
+              break;
+            }
+
+            try {
+              const message = JSON.parse(data) as Message;
+
+              if (message.type === "error") {
+                throw new Error(message.message);
+              } else {
+                setMessages((prev) => [...prev, message]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      // Save branch name to localStorage for future use
+      if (typeof window !== "undefined") {
+        localStorage.setItem("lastGitBranchName", gitBranchName.trim());
+      }
+
+      // Close modal and reset commit message only
+      setShowGitModal(false);
+      setGitCommitMessage("");
+    } catch (err: any) {
+      console.error("Error saving to git:", err);
+      setMessages((prev) => [...prev, {
+        type: "error",
+        message: err.message || "Failed to save to git"
+      }]);
+    } finally {
+      setIsGitSaving(false);
+    }
   };
 
   const handleQuerySubmit = async () => {
@@ -404,6 +497,14 @@ export default function GeneratePage() {
               >
                 Clear AI Session
               </button>
+              <button
+                onClick={() => setShowGitModal(true)}
+                disabled={!sandboxId}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-gray-400 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={sandboxId ? "Save changes to git" : "Waiting for sandbox"}
+              >
+                Save to Git
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -477,6 +578,71 @@ export default function GeneratePage() {
           )}
         </div>
       </div>
+
+      {/* Git Save Modal */}
+      {showGitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+            <h3 className="text-white text-lg font-semibold mb-4">Save to Git</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Branch Name
+                  <span className="text-gray-600 ml-2">(e2b/ prefix will be added)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="feature-name"
+                  value={gitBranchName}
+                  onChange={(e) => setGitBranchName(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-600"
+                  disabled={isGitSaving}
+                />
+                {gitBranchName && (
+                  <p className="text-gray-500 text-xs mt-1">
+                    Will create: e2b/{gitBranchName}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Commit Message
+                </label>
+                <textarea
+                  placeholder="Describe your changes..."
+                  value={gitCommitMessage}
+                  onChange={(e) => setGitCommitMessage(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-600 resize-none"
+                  disabled={isGitSaving}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowGitModal(false);
+                  setGitCommitMessage("");
+                }}
+                disabled={isGitSaving}
+                className="flex-1 px-4 py-2 bg-gray-800 text-gray-400 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGitSave}
+                disabled={!gitBranchName.trim() || !gitCommitMessage.trim() || isGitSaving}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGitSaving ? "Saving..." : "Save to Git"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
