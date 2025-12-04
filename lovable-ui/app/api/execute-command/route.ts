@@ -16,7 +16,7 @@ async function safeWrite(writer: WritableStreamDefaultWriter, encoder: TextEncod
 
 export async function POST(req: NextRequest) {
   try {
-    const { sandboxId, commandType, query } = await req.json();
+    const { sandboxId, commandType, query, sessionId } = await req.json();
 
     if (!sandboxId || !commandType || !query) {
       return new Response(
@@ -72,7 +72,12 @@ export async function POST(req: NextRequest) {
         let command: string;
         if (commandType === "ai") {
           // For AI commands, use npm run feature with the user query
-          command = `pnpx tsx scripts/feature-assistant.ts -- "${query}"`;
+          // Include session ID if provided
+          if (sessionId) {
+            command = `pnpx tsx scripts/feature-assistant.ts -- "${query}" --session-id ${sessionId}`;
+          } else {
+            command = `pnpx tsx scripts/feature-assistant.ts -- "${query}"`;
+          }
           console.log("[API] AI command:", command);
         } else {
           // For shell commands, use the query directly
@@ -93,8 +98,18 @@ export async function POST(req: NextRequest) {
           const line = args.join(" ");
           if (!line.trim()) return;
 
+          // Parse session ID from [System]: Session started: <session-id>
+          if (line.includes('[System]: Session started:')) {
+            const match = line.match(/\[System\]: Session started:\s*([a-f0-9-]+)/i);
+            if (match) {
+              safeWrite(writer, encoder, {
+                type: "session_id",
+                sessionId: match[1]
+              });
+            }
+          }
           // Parse Claude messages
-          if (line.includes('__CLAUDE_MESSAGE__')) {
+          else if (line.includes('__CLAUDE_MESSAGE__')) {
             const jsonStart = line.indexOf('__CLAUDE_MESSAGE__') + '__CLAUDE_MESSAGE__'.length;
             try {
               const message = JSON.parse(line.substring(jsonStart).trim());

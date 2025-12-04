@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import GenerateNavbar from "@/components/GenerateNavbar";
 
 interface Message {
-  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete";
+  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete" | "session_id";
   content?: string;
   name?: string;
   input?: any;
@@ -13,6 +13,7 @@ interface Message {
   message?: string;
   previewUrl?: string;
   sandboxId?: string;
+  sessionId?: string;
 }
 
 export default function GeneratePage() {
@@ -31,6 +32,7 @@ export default function GeneratePage() {
   const [commandMode, setCommandMode] = useState<"shell" | "ai">("ai");
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [showMastra, setShowMastra] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
@@ -155,6 +157,15 @@ export default function GeneratePage() {
     }
   };
 
+  const clearSessionId = () => {
+    setSessionId(null);
+    setMessages((prev) => [...prev, {
+      type: "progress",
+      message: "AI session cleared. Next command will start a new session."
+    }]);
+    console.log("AI session cleared");
+  };
+
   const handleQuerySubmit = async () => {
     if (!userQuery.trim() || !sandboxId || isQueryProcessing) return;
 
@@ -173,12 +184,18 @@ export default function GeneratePage() {
       abortControllerRef.current = new AbortController();
 
       // Use the selected command mode
+      // Include sessionId only for AI commands
+      const requestBody: any = { sandboxId, commandType: commandMode, query };
+      if (commandMode === "ai" && sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+
       const response = await fetch("/api/execute-command", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ sandboxId, commandType: commandMode, query }),
+        body: JSON.stringify(requestBody),
         signal: abortControllerRef.current.signal,
       });
 
@@ -216,6 +233,10 @@ export default function GeneratePage() {
               } else if ((message as any).type === "request_id") {
                 // Store the request ID for potential cancellation
                 setCurrentRequestId((message as any).requestId);
+              } else if (message.type === "session_id" && message.sessionId) {
+                // Store the session ID for future AI requests
+                setSessionId(message.sessionId);
+                console.log("AI Session ID:", message.sessionId);
               } else {
                 setMessages((prev) => [...prev, message]);
               }
@@ -294,6 +315,12 @@ export default function GeneratePage() {
             <p className="text-gray-400 text-sm mt-1 break-words">
               {templateName ? `Template: ${templateName}` : "Setting up..."}
             </p>
+            {sessionId && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <p className="text-green-400 text-xs">AI Session Active</p>
+              </div>
+            )}
           </div>
           
           {/* Messages */}
@@ -368,6 +395,14 @@ export default function GeneratePage() {
                 }`}
               >
                 Shell Mode
+              </button>
+              <button
+                onClick={clearSessionId}
+                disabled={!sessionId}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-gray-400 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={sessionId ? "Clear AI session and start fresh" : "No active session"}
+              >
+                Clear AI Session
               </button>
             </div>
 
