@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
+import GenerateNavbar from "@/components/GenerateNavbar";
 
 interface Message {
   type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete";
@@ -29,6 +29,9 @@ export default function GeneratePage() {
   const [userQuery, setUserQuery] = useState("");
   const [isQueryProcessing, setIsQueryProcessing] = useState(false);
   const [commandMode, setCommandMode] = useState<"shell" | "ai">("ai");
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+  const [showMastra, setShowMastra] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
   
@@ -121,6 +124,37 @@ export default function GeneratePage() {
     }
   };
 
+  const stopExecution = async () => {
+    if (!currentRequestId) return;
+
+    try {
+      // Abort the fetch stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      // Call cancel API to kill the backend process
+      await fetch("/api/cancel-execution", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId: currentRequestId }),
+      });
+
+      setMessages((prev) => [...prev, {
+        type: "error",
+        message: "Execution stopped by user"
+      }]);
+
+      setIsQueryProcessing(false);
+      setCurrentRequestId(null);
+    } catch (err: any) {
+      console.error("Error stopping execution:", err);
+    }
+  };
+
   const handleQuerySubmit = async () => {
     if (!userQuery.trim() || !sandboxId || isQueryProcessing) return;
 
@@ -135,6 +169,9 @@ export default function GeneratePage() {
     }]);
 
     try {
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+
       // Use the selected command mode
       const response = await fetch("/api/execute-command", {
         method: "POST",
@@ -142,6 +179,7 @@ export default function GeneratePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ sandboxId, commandType: commandMode, query }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -175,6 +213,9 @@ export default function GeneratePage() {
 
               if (message.type === "error") {
                 throw new Error(message.message);
+              } else if ((message as any).type === "request_id") {
+                // Store the request ID for potential cancellation
+                setCurrentRequestId((message as any).requestId);
               } else {
                 setMessages((prev) => [...prev, message]);
               }
@@ -185,13 +226,18 @@ export default function GeneratePage() {
         }
       }
     } catch (err: any) {
-      console.error("Error executing query:", err);
-      setMessages((prev) => [...prev, {
-        type: "error",
-        message: err.message || "Failed to execute query"
-      }]);
+      // Don't show error if it was manually aborted
+      if (err.name !== "AbortError") {
+        console.error("Error executing query:", err);
+        setMessages((prev) => [...prev, {
+          type: "error",
+          message: err.message || "Failed to execute query"
+        }]);
+      }
     } finally {
       setIsQueryProcessing(false);
+      setCurrentRequestId(null);
+      abortControllerRef.current = null;
     }
   };
   
@@ -223,9 +269,19 @@ export default function GeneratePage() {
     return JSON.stringify(input).substring(0, 100) + "...";
   };
 
+  // Compute current display URL based on toggle state
+  const displayUrl = previewUrl && showMastra
+    ? previewUrl.replace(/3000-/, "4111-")
+    : previewUrl;
+
   return (
     <main className="h-screen bg-black flex flex-col overflow-hidden relative">
-      <Navbar />
+      <GenerateNavbar
+        sandboxId={sandboxId}
+        previewUrl={previewUrl}
+        showMastra={showMastra}
+        onToggleMastra={() => setShowMastra(!showMastra)}
+      />
       {/* Spacer for navbar */}
       <div className="h-16" />
       
@@ -336,29 +392,32 @@ export default function GeneratePage() {
                 className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg border border-gray-800 focus:outline-none focus:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!previewUrl || isQueryProcessing}
               />
-              <button
-                onClick={handleQuerySubmit}
-                disabled={!previewUrl || !userQuery.trim() || isQueryProcessing}
-                className="p-2 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isQueryProcessing ? (
-                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
+              {isQueryProcessing && currentRequestId ? (
+                <button
+                  onClick={stopExecution}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm"
+                  title="Stop execution"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleQuerySubmit}
+                  disabled={!previewUrl || !userQuery.trim() || isQueryProcessing}
+                  className="p-2 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                   </svg>
-                )}
-              </button>
+                </button>
+              )}
             </div>
           </div>
         </div>
         
         {/* Right side - Preview */}
         <div className="w-[70%] bg-gray-950 flex items-center justify-center">
-          {!previewUrl && isGenerating && (
+          {!displayUrl && isGenerating && (
             <div className="text-center">
               <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
                 <div className="w-12 h-12 bg-gray-700 rounded-xl animate-pulse"></div>
@@ -366,16 +425,17 @@ export default function GeneratePage() {
               <p className="text-gray-400">Spinning up preview...</p>
             </div>
           )}
-          
-          {previewUrl && (
+
+          {displayUrl && (
             <iframe
-              src={previewUrl}
+              key={displayUrl}
+              src={displayUrl}
               className="w-full h-full"
               title="Website Preview"
             />
           )}
-          
-          {!previewUrl && !isGenerating && (
+
+          {!displayUrl && !isGenerating && (
             <div className="text-center">
               <p className="text-gray-400">Preview will appear here</p>
             </div>
