@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         let command: string;
         if (commandType === "ai") {
           // For AI commands, use npm run feature with the user query
-          command = `npm run feature -- "${query}"`;
+          command = `pnpx tsx scripts/feature-assistant.ts -- "${query}"`;
           console.log("[API] AI command:", command);
         } else {
           // For shell commands, use the query directly

@@ -9,8 +9,8 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-if (!process.env.E2B_API_KEY || !process.env.ANTHROPIC_API_KEY) {
-  console.error("ERROR: E2B_API_KEY and ANTHROPIC_API_KEY must be set");
+if (!process.env.E2B_API_KEY || !process.env.ANTHROPIC_API_KEY || !process.env.GITHUB_TOKEN) {
+  console.error("ERROR: E2B_API_KEY and ANTHROPIC_API_KEY and GITHUB_TOKEN must be set");
   console.log(path.join(__dirname, "../../.env"))
   process.exit(1);
 }
@@ -71,10 +71,15 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
       console.log(`✅ Set ${Object.keys(envVars).length} environment variables`)
     }
 
+    // setup github token
+    await sandbox.commands.run(
+      `cd /home/user/app && ./scripts/git_ops.sh setupGh ${process.env.GITHUB_TOKEN}`
+    )
+
     // Start Next.js
     console.log('\n🌐 Starting Next.js server on port 3000...')
     await sandbox.commands.run(
-      'cd /home/user/app && nohup npm run dev > /tmp/nextjs.log 2>&1 &',
+      'cd /home/user/app && nohup pnpm run dev > /tmp/nextjs.log 2>&1 &',
       {
         background: true
       }
@@ -83,7 +88,7 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
     // Start Mastra
     console.log('⚙️  Starting Mastra dev server on port 4111...')
     await sandbox.commands.run(
-      'cd /home/user/app && nohup npm run mastraDev > /tmp/mastra.log 2>&1 &',
+      'cd /home/user/app && nohup pnpm run mastraDev > /tmp/mastra.log 2>&1 &',
       {
         background: true
       }
