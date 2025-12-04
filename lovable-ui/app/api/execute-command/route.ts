@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
-import { spawn } from "child_process";
-import path from "path";
 import { randomUUID } from "crypto";
 import { runningProcesses } from "@/lib/process-tracker";
+import { executeInSandbox } from "@/e2b_utils";
 
 // Helper to safely write to stream
 async function safeWrite(writer: WritableStreamDefaultWriter, encoder: TextEncoder, data: any): Promise<boolean> {
@@ -69,11 +68,6 @@ export async function POST(req: NextRequest) {
       console.log("[API] Starting execution...");
 
       try {
-        // Use the execute-in-sandbox.ts script
-        const scriptPath = path.join(process.cwd(), "scripts", "execute-in-sandbox.ts");
-
-        console.log("[API] Script path:", scriptPath);
-
         // Prepare command based on type
         let command: string;
         if (commandType === "ai") {
@@ -88,132 +82,110 @@ export async function POST(req: NextRequest) {
 
         // Pass sandbox ID, command, and working directory as arguments
         const workingDir = "/home/user/app";
-        console.log("[API] Spawning process...");
-        const child = spawn("npx", ["tsx", scriptPath, sandboxId, command, workingDir], {
-          env: {
-            ...process.env,
-            E2B_API_KEY: process.env.E2B_API_KEY,
-            ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-          },
-        });
+        console.log("[API] Executing command...");
 
-        // Track this process for potential cancellation
-        runningProcesses.set(requestId, child);
-        console.log("[API] Process spawned, PID:", child.pid);
-        console.log("[API] Tracking request:", requestId);
-        console.log("[API] Total tracked processes:", runningProcesses.size);
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
 
-        let buffer = "";
+        console.log = (...args: any[]) => {
+          originalLog(...args);
+          const line = args.join(" ");
+          if (!line.trim()) return;
 
-        // Capture stdout
-        child.stdout.on("data", async (data) => {
-          console.log("[API] Received stdout data");
-          buffer += data.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-
-            // Parse Claude messages
-            if (line.includes('__CLAUDE_MESSAGE__')) {
-              const jsonStart = line.indexOf('__CLAUDE_MESSAGE__') + '__CLAUDE_MESSAGE__'.length;
-              try {
-                const message = JSON.parse(line.substring(jsonStart).trim());
-                await safeWrite(writer, encoder, {
-                  type: "claude_message",
-                  content: message.content
-                });
-              } catch (e) {
-                // Ignore parse errors
-              }
-            }
-            // Parse tool uses
-            else if (line.includes('__TOOL_USE__')) {
-              const jsonStart = line.indexOf('__TOOL_USE__') + '__TOOL_USE__'.length;
-              try {
-                const toolUse = JSON.parse(line.substring(jsonStart).trim());
-                await safeWrite(writer, encoder, {
-                  type: "tool_use",
-                  name: toolUse.name,
-                  input: toolUse.input
-                });
-              } catch (e) {
-                // Ignore parse errors
-              }
-            }
-            // Parse tool results
-            else if (line.includes('__TOOL_RESULT__')) {
-              // Skip tool results for now to reduce noise
-              continue;
-            }
-            // Regular progress messages
-            else {
-              const output = line.trim();
-
-              // Filter out internal logs
-              if (output &&
-                  !output.includes('[Claude]:') &&
-                  !output.includes('[Tool]:') &&
-                  !output.includes('__')) {
-
-                // Send as progress
-                await safeWrite(writer, encoder, {
-                  type: "progress",
-                  message: output
-                });
-              }
+          // Parse Claude messages
+          if (line.includes('__CLAUDE_MESSAGE__')) {
+            const jsonStart = line.indexOf('__CLAUDE_MESSAGE__') + '__CLAUDE_MESSAGE__'.length;
+            try {
+              const message = JSON.parse(line.substring(jsonStart).trim());
+              safeWrite(writer, encoder, {
+                type: "claude_message",
+                content: message.content
+              });
+            } catch (e) {
+              // Ignore parse errors
             }
           }
-        });
+          // Parse tool uses
+          else if (line.includes('__TOOL_USE__')) {
+            const jsonStart = line.indexOf('__TOOL_USE__') + '__TOOL_USE__'.length;
+            try {
+              const toolUse = JSON.parse(line.substring(jsonStart).trim());
+              safeWrite(writer, encoder, {
+                type: "tool_use",
+                name: toolUse.name,
+                input: toolUse.input
+              });
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+          // Parse tool results
+          else if (line.includes('__TOOL_RESULT__')) {
+            // Skip tool results for now to reduce noise
+            return;
+          }
+          // Regular progress messages
+          else {
+            const output = line.trim();
+            // Filter out internal logs
+            if (output &&
+                !output.includes('[Claude]:') &&
+                !output.includes('[Tool]:') &&
+                !output.includes('__')) {
+              safeWrite(writer, encoder, {
+                type: "progress",
+                message: output
+              });
+            }
+          }
+        };
 
-        // Capture stderr
-        child.stderr.on("data", async (data) => {
-          const error = data.toString();
-          console.error("[API] Received stderr data");
-          console.error("[Execute Error]:", error);
+        console.error = (...args: any[]) => {
+          originalError(...args);
+          const error = args.join(" ");
 
           // Only send actual errors, not debug info
           if (error.includes("Error") || error.includes("Failed")) {
-            await safeWrite(writer, encoder, {
+            safeWrite(writer, encoder, {
               type: "error",
               message: error.trim()
             });
           }
-        });
+        };
 
-        // Wait for process to complete or timeout after 5 minutes
-        const timeout = setTimeout(() => {
-          child.kill();
-        }, 300000); // 5 minutes
+        try {
+          const execution = await executeInSandbox(sandboxId, command, workingDir);
 
-        await new Promise((resolve, reject) => {
-          child.on("exit", (code) => {
-            clearTimeout(timeout);
-            // Remove from tracking when process exits
-            runningProcesses.delete(requestId);
+          // Track the E2B process for cancellation
+          runningProcesses.set(requestId, execution.process);
+          console.log("[API] Tracking E2B process for request:", requestId);
 
-            if (code === 0 || code === null) {
-              resolve(code);
-            } else {
-              reject(new Error(`Process exited with code ${code}`));
-            }
+          // Wait for the process to complete
+          await execution.wait();
+
+          // Remove from tracking when complete
+          runningProcesses.delete(requestId);
+
+          // Restore console before final logging
+          console.log = originalLog;
+          console.error = originalError;
+
+          // Send completion
+          await safeWrite(writer, encoder, {
+            type: "complete"
           });
 
-          child.on("error", (err) => {
-            clearTimeout(timeout);
-            // Remove from tracking on error
-            runningProcesses.delete(requestId);
-            reject(err);
-          });
-        });
+          console.log(`[API] Query execution complete`);
+        } catch (execError: any) {
+          // Remove from tracking on error
+          runningProcesses.delete(requestId);
 
-        // Send completion
-        await safeWrite(writer, encoder, {
-          type: "complete"
-        });
-
-        console.log(`[API] Query execution complete`);
+          // Restore console in case of error
+          console.log = originalLog;
+          console.error = originalError;
+          throw execError;
+        }
 
         // Send done signal
         try {

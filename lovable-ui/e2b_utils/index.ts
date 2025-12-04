@@ -1,4 +1,4 @@
-import { Sandbox } from '@e2b/code-interpreter'
+import { Sandbox } from '@e2b/code-interpreter';
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from 'url';
@@ -7,13 +7,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables
 dotenv.config({ path: path.join(__dirname, "../.env") });
-
-if (!process.env.E2B_API_KEY || !process.env.ANTHROPIC_API_KEY || !process.env.GITHUB_TOKEN) {
-  console.error("ERROR: E2B_API_KEY and ANTHROPIC_API_KEY and GITHUB_TOKEN must be set");
-  console.log(path.join(__dirname, "../../.env"))
-  process.exit(1);
-}
 
 interface DeploymentConfig {
   templateName: string;
@@ -22,7 +17,18 @@ interface DeploymentConfig {
   healthCheckRetries?: number;
 }
 
-async function deployTemplateInSandbox(config: DeploymentConfig) {
+interface DeploymentResult {
+  sandbox: Sandbox;
+  sandboxId: string;
+  url: string;
+  getLogs: () => Promise<{ devLogs: string }>;
+  extendTimeout: (hours?: number) => Promise<void>;
+}
+
+/**
+ * Deploy a template in a sandbox and wait for services to be ready
+ */
+export async function deployTemplateInSandbox(config: DeploymentConfig): Promise<DeploymentResult> {
   const {
     templateName,
     envVars = {},
@@ -33,7 +39,7 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
   console.log('🚀 Starting deployment...')
   console.log('📝 Template Name:', templateName)
 
-  const sandbox = await Sandbox.create(templateName,{
+  const sandbox = await Sandbox.create(templateName, {
     apiKey: process.env.E2B_API_KEY,
     timeoutMs: 600_000 // 10 minutes
   })
@@ -49,8 +55,8 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
     const initResult = await sandbox.commands.run(
       `echo "Template ${templateName} is being used for this sandbox"`,
       {
-        onStdout: (data) => process.stdout.write(data),
-        onStderr: (data) => process.stderr.write(data)
+        onStdout: (data) => { process.stdout.write(data); },
+        onStderr: (data) => { process.stderr.write(data); }
       }
     )
 
@@ -72,9 +78,11 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
     }
 
     // setup github token
-    await sandbox.commands.run(
-      `cd /home/user/app && ./scripts/git_ops.sh setupGh ${process.env.GITHUB_TOKEN}`
-    )
+    if (process.env.GITHUB_TOKEN) {
+      await sandbox.commands.run(
+        `cd /home/user/app && ./scripts/git_ops.sh setupGh ${process.env.GITHUB_TOKEN}`
+      )
+    }
 
     // Start Next.js
     console.log('\n🌐 Starting Next.js server on port 3000...')
@@ -99,7 +107,7 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
       port: number,
       serviceName: string,
       retries = healthCheckRetries
-    ) => {
+    ): Promise<{ url: string; ready: boolean }> => {
       const host = sandbox.getHost(port)
       const url = `https://${host}`
 
@@ -141,6 +149,7 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
           await new Promise(resolve => setTimeout(resolve, 3000))
         }
       }
+      throw new Error(`${serviceName} failed after all retries`)
     }
 
     // Wait for service to be ready
@@ -202,71 +211,128 @@ async function deployTemplateInSandbox(config: DeploymentConfig) {
   }
 }
 
-// Main execution
-async function main() {
-  // Validate environment variables
+/**
+ * Execute a command in an existing sandbox with cancellation support
+ */
+export async function executeInSandbox(
+  sandboxId: string,
+  command: string,
+  workingDir?: string
+) {
   if (!process.env.E2B_API_KEY) {
-    console.error('❌ Error: E2B_API_KEY is not set in environment variables')
-    console.error('Please add it to your .env file or set it as an environment variable')
-    process.exit(1)
+    throw new Error("E2B_API_KEY must be set");
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('❌ Error: ANTHROPIC_API_KEY is not set in environment variables')
-    process.exit(1)
-  }
-
-  // Get template config from environment variables or use defaults
-  const templateName = process.env.TEMPLATE_NAME || 'hack-skeleton-joke';
+  let sandbox: Sandbox | null = null;
+  let killed = false;
+  const pidFile = `/tmp/process_${Date.now()}_${Math.random().toString(36).slice(2, 11)}.pid`;
 
   try {
-    const deployment = await deployTemplateInSandbox({
-      templateName,
-      envVars: {
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,
-        GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
-        NODE_ENV: 'development',
-        // Add any other env vars your template needs
-      },
-      waitTimeout: 60000,
-      healthCheckRetries: 20
-    })
+    // Connect to the sandbox
+    console.log(`Connecting to sandbox: ${sandboxId}`);
+    sandbox = await Sandbox.connect(sandboxId);
 
-    // Share URL with user
-    console.log('📤 Application deployed successfully!')
-    console.log('   Application:', deployment.url)
-    console.log('   Sandbox ID:', deployment.sandboxId)
-
-    // Optional: Get logs after successful deployment
-    if (process.argv.includes('--logs')) {
-      console.log('\n📋 Fetching logs...')
-      const logs = await deployment.getLogs()
-      console.log('\nDev server logs:\n', logs.devLogs)
+    if (!sandbox) {
+      throw new Error(`Sandbox ${sandboxId} not found`);
     }
 
-    // Exit successfully - sandbox will remain running
-    console.log('\n✅ Deployment complete!')
-    process.exit(0)
+    console.log(`✓ Connected to sandbox`);
 
-  } catch (error: any) {
-    console.error('\n❌ Fatal error:', error.message)
-    process.exit(1)
+    // Working directory is not needed in E2b, but we can use it in the command if specified
+    if (workingDir) {
+      console.log(`Working directory: ${workingDir}`);
+    }
+
+    // Execute command with PID tracking
+    console.log(`\nExecuting: ${command}\n`);
+
+    // Wrap command to save PID for later killing
+    const wrappedCommand = `
+      (
+        ${workingDir ? `cd ${workingDir} && ` : ''}${command}
+      ) &
+      echo $! > ${pidFile}
+      wait $!
+      EXIT_CODE=$?
+      rm -f ${pidFile}
+      exit $EXIT_CODE
+    `;
+
+    // Create a promise that will run the command
+    const commandPromise = sandbox.commands.run(wrappedCommand, {
+      timeoutMs: 600000, // 10 minutes
+      onStdout: (data: string) => { console.log(data); },
+      onStderr: (data: string) => { console.error(data); }
+    });
+
+    // Store sandbox reference for closures
+    const sbx = sandbox;
+
+    // Return a killable process interface
+    return {
+      process: {
+        kill: async (signal?: string) => {
+          killed = true;
+          try {
+            // Read the PID from the file
+            const pidResult = await sbx.commands.run(`cat ${pidFile} 2>/dev/null || echo ""`);
+            const pid = pidResult.stdout.trim();
+
+            if (pid) {
+              // Kill the process by PID
+              await sbx.commands.run(`kill -${signal || 'TERM'} ${pid} 2>/dev/null || true`);
+              console.log(`Killed process ${pid} with signal ${signal || 'TERM'}`);
+            }
+
+            // Clean up PID file
+            await sbx.commands.run(`rm -f ${pidFile}`);
+          } catch (error) {
+            console.error("Error killing process:", error);
+          }
+        },
+        wait: async () => {
+          const result = await commandPromise;
+          return { code: result.exitCode };
+        }
+      },
+      sandbox: sbx,
+      // Wait for the process to complete
+      wait: async () => {
+        if (killed) {
+          throw new Error("Process was killed");
+        }
+        const result = await commandPromise;
+        console.log("=== PROCESS COMPLETED ===");
+        console.log("Exit code:", result.exitCode);
+
+        if (result.exitCode !== 0) {
+          throw new Error(`Command exited with code ${result.exitCode}`);
+        }
+
+        return result;
+      }
+    };
+  } catch (error) {
+    throw error;
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n\n👋 Received SIGINT, cleaning up...')
-  process.exit(0)
-})
+/**
+ * Remove/kill a sandbox
+ */
+export async function removeSandbox(sandboxId: string) {
+  if (!process.env.E2B_API_KEY) {
+    throw new Error("E2B_API_KEY must be set");
+  }
 
-process.on('SIGTERM', () => {
-  console.log('\n\n👋 Received SIGTERM, cleaning up...')
-  process.exit(0)
-})
+  try {
+    console.log(`Removing sandbox: ${sandboxId}...`);
+    const sandbox = await Sandbox.connect(sandboxId);
 
-// Run the main function
-main().catch((error) => {
-  console.error('Unhandled error:', error)
-  process.exit(1)
-})
+    await sandbox.kill();
+    console.log("✓ Sandbox removed successfully");
+    return { success: true };
+  } catch (error) {
+    throw error;
+  }
+}

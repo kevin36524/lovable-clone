@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { spawn } from "child_process";
-import path from "path";
+import { deployTemplateInSandbox } from "@/e2b_utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,115 +29,95 @@ export async function POST(req: NextRequest) {
     // Start the async deployment
     (async () => {
       try {
-        // Use the deploy-e2b-template.ts script
-        const scriptPath = path.join(process.cwd(), "scripts", "deploy-e2b-template.ts");
-
-        // Pass template info as environment variables
-        const child = spawn("npx", ["tsx", scriptPath], {
-          env: {
-            ...process.env,
-            E2B_API_KEY: process.env.E2B_API_KEY,
-            ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-            TEMPLATE_NAME: templateName,
-            GIT_BRANCH: gitBranch || "",
-          },
-        });
-
         let sandboxId = "";
         let previewUrl = "";
-        let buffer = "";
 
-        // Capture stdout
-        child.stdout.on("data", async (data) => {
-          buffer += data.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
 
-          for (const line of lines) {
-            if (!line.trim()) continue;
+        console.log = (...args: any[]) => {
+          originalLog(...args);
+          const output = args.join(" ");
 
-            const output = line.trim();
-
-            // Send as progress
-            await writer.write(
-              encoder.encode(`data: ${JSON.stringify({
-                type: "progress",
-                message: output
-              })}\n\n`)
-            );
-
-            // Extract sandbox ID
-            const sandboxMatch = output.match(/Sandbox created: ([a-z0-9-]+)/i) ||
-                                 output.match(/Sandbox ID:\s+([a-z0-9-]+)/i);
-            if (sandboxMatch) {
-              sandboxId = sandboxMatch[1];
-              console.log("[API] Extracted Sandbox ID:", sandboxId);
-            }
-
-            // Extract preview URL - look for Application URL
-            const previewMatch = output.match(/Application:\s+(https:\/\/[^\s]+)/i) ||
-                                output.match(/Preview URL:\s+(https:\/\/[^\s]+)/i) ||
-                                output.match(/(https:\/\/[a-z0-9-]+-3000\..*?\.e2b\.dev)/i);
-            if (previewMatch) {
-              previewUrl = previewMatch[1];
-              console.log("[API] Extracted Preview URL:", previewUrl);
-            }
+          // Extract sandbox ID
+          const sandboxMatch = output.match(/Sandbox created: ([a-z0-9-]+)/i) ||
+                               output.match(/Sandbox ID:\s+([a-z0-9-]+)/i);
+          if (sandboxMatch) {
+            sandboxId = sandboxMatch[1];
+            originalLog("[API] Extracted Sandbox ID:", sandboxId);
           }
-        });
 
-        // Capture stderr
-        child.stderr.on("data", async (data) => {
-          const error = data.toString();
-          console.error("[E2B Error]:", error);
+          // Extract preview URL - look for Application URL
+          const previewMatch = output.match(/Application:\s+(https:\/\/[^\s]+)/i) ||
+                              output.match(/Preview URL:\s+(https:\/\/[^\s]+)/i) ||
+                              output.match(/(https:\/\/[a-z0-9-]+-3000\..*?\.e2b\.dev)/i);
+          if (previewMatch) {
+            previewUrl = previewMatch[1];
+          }
+
+          // Send as progress
+          writer.write(
+            encoder.encode(`data: ${JSON.stringify({
+              type: "progress",
+              message: output
+            })}\n\n`)
+          );
+        };
+
+        console.error = (...args: any[]) => {
+          originalError(...args);
+          const error = args.join(" ");
 
           // Only send actual errors, not debug info
           if (error.includes("Error") || error.includes("Failed")) {
-            await writer.write(
+            writer.write(
               encoder.encode(`data: ${JSON.stringify({
                 type: "error",
-                message: error.trim()
+                message: error
               })}\n\n`)
             );
           }
-        });
+        };
 
-        // Wait for process to complete or timeout after 10 minutes
-        const timeout = setTimeout(() => {
-          child.kill();
-        }, 600000); // 10 minutes
-
-        await new Promise((resolve, reject) => {
-          child.on("exit", (code) => {
-            clearTimeout(timeout);
-            if (code === 0) {
-              resolve(code);
-            } else {
-              reject(new Error(`Process exited with code ${code}`));
-            }
+        try {
+          await deployTemplateInSandbox({
+            templateName,
+            envVars: {
+              ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,
+              GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
+              NODE_ENV: 'development',
+            },
+            waitTimeout: 60000,
+            healthCheckRetries: 20
           });
 
-          child.on("error", (err) => {
-            clearTimeout(timeout);
-            reject(err);
-          });
-        });
+          // Restore console before final logging
+          console.log = originalLog;
+          console.error = originalError;
 
-        // Send completion with preview URL
-        if (previewUrl && sandboxId) {
-          await writer.write(
-            encoder.encode(`data: ${JSON.stringify({
-              type: "complete",
-              sandboxId,
-              previewUrl
-            })}\n\n`)
-          );
-          console.log(`[API] Deployment complete. Sandbox: ${sandboxId}, Preview URL: ${previewUrl}`);
-        } else {
-          throw new Error(`Failed to get preview URL or sandbox ID. URL: ${previewUrl}, ID: ${sandboxId}`);
+          // Send completion with preview URL
+          if (previewUrl && sandboxId) {
+            await writer.write(
+              encoder.encode(`data: ${JSON.stringify({
+                type: "complete",
+                sandboxId,
+                previewUrl
+              })}\n\n`)
+            );
+            console.log(`[API] Deployment complete. Sandbox: ${sandboxId}, Preview URL: ${previewUrl}`);
+          } else {
+            throw new Error(`Failed to get preview URL or sandbox ID. URL: ${previewUrl}, ID: ${sandboxId}`);
+          }
+
+          // Send done signal
+          await writer.write(encoder.encode("data: [DONE]\n\n"));
+        } catch (deployError: any) {
+          // Restore console in case of error
+          console.log = originalLog;
+          console.error = originalError;
+          throw deployError;
         }
-
-        // Send done signal
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
       } catch (error: any) {
         console.error("[API] Error during deployment:", error);
         await writer.write(
