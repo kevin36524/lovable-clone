@@ -6,14 +6,16 @@ interface MessageDisplayProps {
 }
 
 export default function MessageDisplay({ messages }: MessageDisplayProps) {
+  // Cast to any[] since the actual message types include 'tool_use' which isn't in SDKMessage type
+  const messageList = messages as any[];
   const [generatedPages, setGeneratedPages] = useState<string[]>([]);
   
   useEffect(() => {
     // Look for generated pages
-    const pages = messages
-      .filter((m: any) => 
-        m.type === 'tool_use' && 
-        m.name === 'Write' && 
+    const pages = messageList
+      .filter((m: any) =>
+        m.type === 'tool_use' &&
+        m.name === 'Write' &&
         m.input?.file_path?.includes('/app/') &&
         (m.input?.file_path?.endsWith('.tsx') || m.input?.file_path?.endsWith('/page.tsx'))
       )
@@ -22,15 +24,15 @@ export default function MessageDisplay({ messages }: MessageDisplayProps) {
         const match = path.match(/\/app\/([^\/]+)\//);
         return match ? `/${match[1]}` : null;
       })
-      .filter(Boolean);
-    
-    setGeneratedPages([...new Set(pages)]);
-  }, [messages]);
+      .filter((page): page is string => page !== null);
+
+    setGeneratedPages(Array.from(new Set(pages)));
+  }, [messageList]);
   
-  if (messages.length === 0) return null;
-  
+  if (messageList.length === 0) return null;
+
   // Filter to show only assistant messages and tool uses
-  const displayMessages = messages.filter(m => 
+  const displayMessages = messageList.filter((m: any) =>
     m.type === 'assistant' || m.type === 'tool_use' || m.type === 'result'
   );
   
@@ -125,7 +127,7 @@ export default function MessageDisplay({ messages }: MessageDisplayProps) {
           })}
           
           {/* Show typing indicator if still generating */}
-          {messages.length > 0 && !messages.some((m: any) => m.type === 'result') && (
+          {messageList.length > 0 && !messageList.some((m: any) => m.type === 'result') && (
             <div className="flex items-center gap-2 text-gray-500">
               <div className="flex gap-1">
                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />

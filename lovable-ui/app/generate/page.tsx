@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import GenerateNavbar from "@/components/GenerateNavbar";
 
@@ -16,7 +16,7 @@ interface Message {
   sessionId?: string;
 }
 
-export default function GeneratePage() {
+function GeneratePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const templateName = searchParams.get("templateName") || "";
@@ -644,5 +644,17 @@ export default function GeneratePage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-black flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    }>
+      <GeneratePageContent />
+    </Suspense>
   );
 }
