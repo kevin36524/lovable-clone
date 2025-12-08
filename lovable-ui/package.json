@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deployCloudRun": "gcloud auth activate-service-account --key-file=twiliotest-admin-key.json && gcloud run deploy lovable-ui --source . --platform managed --region us-central1 --allow-unauthenticated --service-account calproxy-service-account@twiliotest-8d802.iam.gserviceaccount.com --project twiliotest-8d802 --env-vars-file env.yaml"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.55",
