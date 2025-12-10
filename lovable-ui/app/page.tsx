@@ -65,7 +65,7 @@ export default function Home() {
             Build something with Hackable
           </h1>
           <h3 className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            BUILT WITH CLAUDE CODE
+            Build with ❤️ by X-Team
           </h3>
 
           <p className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
