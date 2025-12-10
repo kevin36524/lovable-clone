@@ -89,13 +89,8 @@ export async function POST(req: NextRequest) {
         const workingDir = "/home/user/app";
         console.log("[API] Executing command...");
 
-        // Capture console output
-        const originalLog = console.log;
-        const originalError = console.error;
-
-        console.log = (...args: any[]) => {
-          originalLog(...args);
-          const line = args.join(" ");
+        // Create a local logger that routes output to this specific request
+        const handleOutput = (line: string) => {
           if (!line.trim()) return;
 
           // Parse session ID from [System]: Session started: <session-id>
@@ -156,10 +151,7 @@ export async function POST(req: NextRequest) {
           }
         };
 
-        console.error = (...args: any[]) => {
-          originalError(...args);
-          const error = args.join(" ");
-
+        const handleError = (error: string) => {
           // Only send actual errors, not debug info
           if (error.includes("Error") || error.includes("Failed")) {
             safeWrite(writer, encoder, {
@@ -170,35 +162,37 @@ export async function POST(req: NextRequest) {
         };
 
         try {
-          const execution = await executeInSandbox(sandboxId, command, workingDir);
+          try {
+            const execution = await executeInSandbox(
+              sandboxId,
+              command,
+              workingDir,
+              (...args: any[]) => handleOutput(args.join(" ")),
+              (...args: any[]) => handleError(args.join(" "))
+            );
 
-          // Track the E2B process for cancellation
-          runningProcesses.set(requestId, execution.process);
-          console.log("[API] Tracking E2B process for request:", requestId);
+            // Track the E2B process for cancellation
+            runningProcesses.set(requestId, execution.process);
+            console.log("[API] Tracking E2B process for request:", requestId);
 
-          // Wait for the process to complete
-          await execution.wait();
+            // Wait for the process to complete
+            await execution.wait();
 
-          // Remove from tracking when complete
-          runningProcesses.delete(requestId);
+            // Remove from tracking when complete
+            runningProcesses.delete(requestId);
 
-          // Restore console before final logging
-          console.log = originalLog;
-          console.error = originalError;
+            // Send completion
+            await safeWrite(writer, encoder, {
+              type: "complete"
+            });
 
-          // Send completion
-          await safeWrite(writer, encoder, {
-            type: "complete"
-          });
-
-          console.log(`[API] Query execution complete`);
+            console.log(`[API] Query execution complete`);
+          } catch (execError: any) {
+            // Remove from tracking on error
+            runningProcesses.delete(requestId);
+            throw execError;
+          }
         } catch (execError: any) {
-          // Remove from tracking on error
-          runningProcesses.delete(requestId);
-
-          // Restore console in case of error
-          console.log = originalLog;
-          console.error = originalError;
           throw execError;
         }
 

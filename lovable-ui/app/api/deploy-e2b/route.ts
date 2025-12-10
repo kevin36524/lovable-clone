@@ -35,14 +35,12 @@ export async function POST(req: NextRequest) {
         let sandboxId = "";
         let previewUrl = "";
 
-        // Capture console output
+        // Save original console methods for potential restoration
         const originalLog = console.log;
         const originalError = console.error;
 
-        console.log = (...args: any[]) => {
-          originalLog(...args);
-          const output = args.join(" ");
-
+        // Create local handler functions scoped to this request
+        const handleOutput = (output: string) => {
           // Extract sandbox ID
           const sandboxMatch = output.match(/Sandbox created: ([a-z0-9-]+)/i) ||
                                output.match(/Sandbox ID:\s+([a-z0-9-]+)/i);
@@ -59,27 +57,32 @@ export async function POST(req: NextRequest) {
             previewUrl = previewMatch[1];
           }
 
-          // Send as progress
-          writer.write(
-            encoder.encode(`data: ${JSON.stringify({
-              type: "progress",
-              message: output
-            })}\n\n`)
-          );
-        };
-
-        console.error = (...args: any[]) => {
-          originalError(...args);
-          const error = args.join(" ");
-
-          // Only send actual errors, not debug info
-          if (error.includes("Error") || error.includes("Failed")) {
+          // Send as progress, with error handling for closed streams
+          try {
             writer.write(
               encoder.encode(`data: ${JSON.stringify({
-                type: "error",
-                message: error
+                type: "progress",
+                message: output
               })}\n\n`)
             );
+          } catch (e) {
+            // Stream is closed, ignore
+          }
+        };
+
+        const handleError = (error: string) => {
+          // Only send actual errors, not debug info
+          if (error.includes("Error") || error.includes("Failed")) {
+            try {
+              writer.write(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: "error",
+                  message: error
+                })}\n\n`)
+              );
+            } catch (e) {
+              // Stream is closed, ignore
+            }
           }
         };
 
@@ -93,12 +96,16 @@ export async function POST(req: NextRequest) {
             },
             waitTimeout: 60000,
             healthCheckRetries: 20,
-            gitBranch
+            gitBranch,
+            onLog: (...args: any[]) => {
+              originalLog(...args);
+              handleOutput(args.join(" "));
+            },
+            onError: (...args: any[]) => {
+              originalError(...args);
+              handleError(args.join(" "));
+            }
           });
-
-          // Restore console before final logging
-          console.log = originalLog;
-          console.error = originalError;
 
           // Send completion with preview URL
           if (previewUrl && sandboxId) {
@@ -117,9 +124,6 @@ export async function POST(req: NextRequest) {
           // Send done signal
           await writer.write(encoder.encode("data: [DONE]\n\n"));
         } catch (deployError: any) {
-          // Restore console in case of error
-          console.log = originalLog;
-          console.error = originalError;
           throw deployError;
         }
       } catch (error: any) {

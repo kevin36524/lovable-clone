@@ -16,6 +16,8 @@ interface DeploymentConfig {
   waitTimeout?: number;
   healthCheckRetries?: number;
   gitBranch?: string;
+  onLog?: (message: string) => void;
+  onError?: (message: string) => void;
 }
 
 interface DeploymentResult {
@@ -35,11 +37,13 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     envVars = {},
     waitTimeout = 60000,
     healthCheckRetries = 15,
-    gitBranch
+    gitBranch,
+    onLog = console.log,
+    onError = console.error
   } = config
 
-  console.log('🚀 Starting deployment...')
-  console.log('📝 Template Name:', templateName)
+  onLog('🚀 Starting deployment...')
+  onLog('📝 Template Name:', templateName)
 
   const sandbox = await Sandbox.create(templateName, {
     apiKey: process.env.E2B_API_KEY,
@@ -47,10 +51,10 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
   })
 
   try {
-    console.log('✅ Sandbox created:', sandbox.sandboxId)
+    onLog('✅ Sandbox created:', sandbox.sandboxId)
 
     // Create template from E2B template
-    console.log('\n📦 Creating environment from template...')
+    onLog('\n📦 Creating environment from template...')
 
     // E2B templates are instantiated via the Sandbox API
     // The template deployment happens during sandbox creation with template specification
@@ -68,7 +72,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 
     // Set environment variables if provided
     if (Object.keys(envVars).length > 0) {
-      console.log('\n🔐 Setting environment variables...')
+      onLog('\n🔐 Setting environment variables...')
       const envContent = Object.entries(envVars)
         .filter(([_, value]) => value !== undefined && value !== null)
         .map(([key, value]) => `${key}=${value}`)
@@ -76,7 +80,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 
       await sandbox.files.write('/home/user/.env.local', envContent)
       await sandbox.files.write('/home/user/app/.env', envContent)
-      console.log(`✅ Set ${Object.keys(envVars).length} environment variables`)
+      onLog(`✅ Set ${Object.keys(envVars).length} environment variables`)
     }
 
     // setup github token
@@ -88,7 +92,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 
     // Switch to git branch if specified
     if (gitBranch) {
-      console.log(`\n🔀 Switching to git branch: ${gitBranch}...`)
+      onLog(`\n🔀 Switching to git branch: ${gitBranch}...`)
       const gitResult = await sandbox.commands.run(
         `cd /home/user/app && ./scripts/git_ops.sh fetchAndSwitch ${gitBranch}`,
         {
@@ -100,11 +104,11 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       if (gitResult.exitCode !== 0) {
         throw new Error(`Failed to switch to branch ${gitBranch}: ${gitResult.stderr}`)
       }
-      console.log(`✅ Switched to branch: ${gitBranch}`)
+      onLog(`✅ Switched to branch: ${gitBranch}`)
     }
 
     // Start Next.js
-    console.log('\n🌐 Starting Next.js server on port 3000...')
+    onLog('\n🌐 Starting Next.js server on port 3000...')
     await sandbox.commands.run(
       'cd /home/user/app && nohup pnpm run dev > /tmp/nextjs.log 2>&1 &',
       {
@@ -113,7 +117,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     )
 
     // Start Mastra
-    console.log('⚙️  Starting Mastra dev server on port 4111...')
+    onLog('⚙️  Starting Mastra dev server on port 4111...')
     await sandbox.commands.run(
       'cd /home/user/app && nohup pnpm run mastraDev > /tmp/mastra.log 2>&1 &',
       {
@@ -130,7 +134,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       const host = sandbox.getHost(port)
       const url = `https://${host}`
 
-      console.log(`\n🔍 Performing health checks for ${serviceName}...`)
+      onLog(`\n🔍 Performing health checks for ${serviceName}...`)
 
       for (let i = 0; i < retries; i++) {
         try {
@@ -139,27 +143,27 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
             signal: AbortSignal.timeout(5000)
           })
 
-          console.log(`   Attempt ${i + 1}/${retries}: ${response.status} ${response.statusText}`)
+          onLog(`   Attempt ${i + 1}/${retries}: ${response.status} ${response.statusText}`)
 
           if (response.ok || response.status === 404 || response.status === 500) {
             // Server is responding (even with errors means it's running)
-            console.log(`✅ ${serviceName} is ready at ${url}`)
+            onLog(`✅ ${serviceName} is ready at ${url}`)
             return { url, ready: true }
           }
         } catch (error: any) {
           const errorMsg = error.message || 'Connection failed'
-          console.log(`   Attempt ${i + 1}/${retries}: ${errorMsg}`)
+          onLog(`   Attempt ${i + 1}/${retries}: ${errorMsg}`)
 
           if (i === retries - 1) {
             // On last retry, check logs
-            console.error(`\n❌ ${serviceName} health check failed after ${retries} attempts`)
+            onError(`\n❌ ${serviceName} health check failed after ${retries} attempts`)
             try {
               const logs = await sandbox.files.read(`/tmp/dev.log`)
-              console.error(`\n📋 ${serviceName} Logs (last 50 lines):`)
+              onError(`\n📋 ${serviceName} Logs (last 50 lines):`)
               const logLines = logs.split('\n').slice(-50)
-              console.error(logLines.join('\n'))
+              onError(logLines.join('\n'))
             } catch (logError) {
-              console.error('Could not read logs')
+              onError('Could not read logs')
             }
             throw new Error(`${serviceName} failed to start`)
           }
@@ -172,19 +176,19 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     }
 
     // Wait for service to be ready
-    console.log('\n⏳ Waiting for service to start...')
-    console.log('This may take 30-60 seconds...')
+    onLog('\n⏳ Waiting for service to start...')
+    onLog('This may take 30-60 seconds...')
 
     const devHealth = await healthCheck(3000, 'Development Server')
 
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('🎉 DEPLOYMENT SUCCESSFUL!')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('\n📱 Application:  ', devHealth.url)
-    console.log('🆔 Sandbox ID:   ', sandbox.sandboxId)
-    console.log('📋 Template:     ', templateName)
-    console.log('\n💡 Tip: Sandbox will auto-terminate after 1 hour (hobby tier)')
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+    onLog('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    onLog('🎉 DEPLOYMENT SUCCESSFUL!')
+    onLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    onLog('\n📱 Application:  ', devHealth.url)
+    onLog('🆔 Sandbox ID:   ', sandbox.sandboxId)
+    onLog('📋 Template:     ', templateName)
+    onLog('\n💡 Tip: Sandbox will auto-terminate after 1 hour (hobby tier)')
+    onLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
     return {
       sandbox,
@@ -196,7 +200,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
           const devLogs = await sandbox.files.read('/tmp/dev.log')
           return { devLogs }
         } catch (error) {
-          console.error('Error reading logs:', error)
+          onError('Error reading logs:', error)
           return { devLogs: '' }
         }
       },
@@ -204,27 +208,27 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       extendTimeout: async (hours: number = 1) => {
         const ms = hours * 60 * 60 * 1000
         await sandbox.setTimeout(ms)
-        console.log(`⏱️  Sandbox timeout extended by ${hours} hour(s)`)
+        onLog(`⏱️  Sandbox timeout extended by ${hours} hour(s)`)
       }
     }
 
   } catch (error: any) {
-    console.error('\n💥 DEPLOYMENT FAILED:', error.message)
+    onError('\n💥 DEPLOYMENT FAILED:', error.message)
 
     // Try to get logs before killing
-    console.log('\n📋 Attempting to retrieve logs...')
+    onLog('\n📋 Attempting to retrieve logs...')
     try {
       const devLogs = await sandbox.files.read('/tmp/dev.log')
 
       if (devLogs) {
-        console.error('\n━━━ Development Server Logs (last 30 lines) ━━━')
-        console.error(devLogs.split('\n').slice(-30).join('\n'))
+        onError('\n━━━ Development Server Logs (last 30 lines) ━━━')
+        onError(devLogs.split('\n').slice(-30).join('\n'))
       }
     } catch (logError) {
-      console.error('Could not retrieve logs')
+      onError('Could not retrieve logs')
     }
 
-    console.log('\n🧹 Cleaning up sandbox...')
+    onLog('\n🧹 Cleaning up sandbox...')
     await sandbox.kill()
     throw error
   }
@@ -236,11 +240,17 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 export async function executeInSandbox(
   sandboxId: string,
   command: string,
-  workingDir?: string
+  workingDir?: string,
+  onLog?: (message: string) => void,
+  onError?: (message: string) => void
 ) {
   if (!process.env.E2B_API_KEY) {
     throw new Error("E2B_API_KEY must be set");
   }
+
+  // Use provided callbacks or fall back to console
+  const log = onLog || console.log;
+  const error = onError || console.error;
 
   let sandbox: Sandbox | null = null;
   let killed = false;
@@ -248,22 +258,22 @@ export async function executeInSandbox(
 
   try {
     // Connect to the sandbox
-    console.log(`Connecting to sandbox: ${sandboxId}`);
+    log(`Connecting to sandbox: ${sandboxId}`);
     sandbox = await Sandbox.connect(sandboxId);
 
     if (!sandbox) {
       throw new Error(`Sandbox ${sandboxId} not found`);
     }
 
-    console.log(`✓ Connected to sandbox`);
+    log(`✓ Connected to sandbox`);
 
     // Working directory is not needed in E2b, but we can use it in the command if specified
     if (workingDir) {
-      console.log(`Working directory: ${workingDir}`);
+      log(`Working directory: ${workingDir}`);
     }
 
     // Execute command with PID tracking
-    console.log(`\nExecuting: ${command}\n`);
+    log(`\nExecuting: ${command}\n`);
 
     // Wrap command to save PID for later killing
     const wrappedCommand = `
@@ -280,8 +290,8 @@ export async function executeInSandbox(
     // Create a promise that will run the command
     const commandPromise = sandbox.commands.run(wrappedCommand, {
       timeoutMs: 600000, // 10 minutes
-      onStdout: (data: string) => { console.log(data); },
-      onStderr: (data: string) => { console.error(data); }
+      onStdout: (data: string) => { log(data); },
+      onStderr: (data: string) => { error(data); }
     });
 
     // Store sandbox reference for closures
@@ -300,13 +310,13 @@ export async function executeInSandbox(
             if (pid) {
               // Kill the process by PID
               await sbx.commands.run(`kill -${signal || 'TERM'} ${pid} 2>/dev/null || true`);
-              console.log(`Killed process ${pid} with signal ${signal || 'TERM'}`);
+              log(`Killed process ${pid} with signal ${signal || 'TERM'}`);
             }
 
             // Clean up PID file
             await sbx.commands.run(`rm -f ${pidFile}`);
-          } catch (error) {
-            console.error("Error killing process:", error);
+          } catch (killError) {
+            error("Error killing process:", killError);
           }
         },
         wait: async () => {
@@ -321,8 +331,8 @@ export async function executeInSandbox(
           throw new Error("Process was killed");
         }
         const result = await commandPromise;
-        console.log("=== PROCESS COMPLETED ===");
-        console.log("Exit code:", result.exitCode);
+        log("=== PROCESS COMPLETED ===");
+        log("Exit code:", result.exitCode);
 
         if (result.exitCode !== 0) {
           throw new Error(`Command exited with code ${result.exitCode}`);
