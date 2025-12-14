@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface GenerateNavbarProps {
   sandboxId: string | null;
@@ -17,6 +18,7 @@ export default function GenerateNavbar({
   onToggleMastra
 }: GenerateNavbarProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isKilling, setIsKilling] = useState(false);
 
   const handleKillSandbox = async () => {
@@ -78,6 +80,16 @@ export default function GenerateNavbar({
 
       {/* Action buttons */}
       <div className="flex items-center gap-3">
+        {/* User display */}
+        {user && (
+          <div className="flex items-center gap-2 text-gray-300 text-sm mr-2">
+            {user.picture && (
+              <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full" />
+            )}
+            <span className="hidden md:inline">{user.name}</span>
+          </div>
+        )}
+
         <button
           onClick={handleKillSandbox}
           disabled={!sandboxId || isKilling}
