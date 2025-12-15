@@ -1,10 +1,8 @@
-# Use the official Node.js 20 image as base
-FROM node:24-alpine as base
+# Use the official Node.js 24 Debian slim image as base
+FROM node:24-slim as base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
@@ -45,6 +43,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 # Uncomment the following line if you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Install basic tools (ca-certificates for secure HTTPS connections to Google APIs)
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

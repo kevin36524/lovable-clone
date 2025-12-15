@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import GenerateNavbar from "@/components/GenerateNavbar";
 
 interface Message {
-  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete" | "session_id";
+  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete" | "session_id" | "request_id";
   content?: string;
   name?: string;
   input?: any;
@@ -14,6 +14,9 @@ interface Message {
   previewUrl?: string;
   sandboxId?: string;
   sessionId?: string;
+  requestId?: string;
+  serviceUrl?: string;
+  serviceName?: string;
 }
 
 function GeneratePageContent() {
@@ -42,6 +45,10 @@ function GeneratePageContent() {
   });
   const [gitCommitMessage, setGitCommitMessage] = useState("");
   const [isGitSaving, setIsGitSaving] = useState(false);
+  const [showCloudRunModal, setShowCloudRunModal] = useState(false);
+  const [cloudRunBranchName, setCloudRunBranchName] = useState("");
+  const [isCloudRunDeploying, setIsCloudRunDeploying] = useState(false);
+  const [cloudRunServiceUrl, setCloudRunServiceUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
@@ -256,6 +263,86 @@ function GeneratePageContent() {
       }]);
     } finally {
       setIsGitSaving(false);
+    }
+  };
+
+  const handleCloudRunDeploy = async () => {
+    if (!cloudRunBranchName.trim()) return;
+
+    setIsCloudRunDeploying(true);
+    const branchName = cloudRunBranchName.trim();
+
+    setMessages((prev) => [...prev, {
+      type: "progress",
+      message: `Starting Cloud Run deployment for branch: ${branchName}`
+    }]);
+
+    try {
+      const response = await fetch("/api/deploy-cloudrun", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ branchName }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start Cloud Run deployment");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+
+            if (data === "[DONE]") {
+              break;
+            }
+
+            try {
+              const message = JSON.parse(data) as Message;
+
+              if (message.type === "error") {
+                throw new Error(message.message);
+              } else if (message.type === "complete") {
+                setCloudRunServiceUrl(message.serviceUrl || null);
+                setMessages((prev) => [...prev, {
+                  type: "progress",
+                  message: `✅ Deployed successfully! URL: ${message.serviceUrl}`
+                }]);
+              } else {
+                setMessages((prev) => [...prev, message]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      setShowCloudRunModal(false);
+      setCloudRunBranchName("");
+    } catch (err: any) {
+      console.error("Error deploying to Cloud Run:", err);
+      setMessages((prev) => [...prev, {
+        type: "error",
+        message: err.message || "Failed to deploy to Cloud Run"
+      }]);
+    } finally {
+      setIsCloudRunDeploying(false);
     }
   };
 
@@ -505,6 +592,14 @@ function GeneratePageContent() {
               >
                 Save to Git
               </button>
+              <button
+                onClick={() => setShowCloudRunModal(true)}
+                disabled={!sandboxId}
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-700 text-white hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={sandboxId ? "Deploy to Cloud Run" : "Waiting for sandbox"}
+              >
+                Deploy to Cloud Run
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -638,6 +733,79 @@ function GeneratePageContent() {
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGitSaving ? "Saving..." : "Save to Git"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Run Deploy Modal */}
+      {showCloudRunModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+            <h3 className="text-white text-lg font-semibold mb-4">Deploy to Cloud Run</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Branch Name
+                  <span className="text-gray-600 ml-2">(e.g., e2b/feature-name or main)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e2b/feature-name"
+                  value={cloudRunBranchName}
+                  onChange={(e) => setCloudRunBranchName(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-600"
+                  disabled={isCloudRunDeploying}
+                />
+                <p className="text-gray-500 text-xs mt-1">
+                  Service name will be: {cloudRunBranchName ? cloudRunBranchName.replace(/\//g, "_") : "(auto-generated)"}
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-3 text-xs">
+                <p className="text-gray-400 mb-2">This will:</p>
+                <ul className="text-gray-500 space-y-1 list-disc list-inside">
+                  <li>Clone the specified branch from GitHub</li>
+                  <li>Deploy to Google Cloud Run (us-central1)</li>
+                  <li>Configure environment variables automatically</li>
+                  <li>Process takes ~3-5 minutes</li>
+                </ul>
+              </div>
+
+              {cloudRunServiceUrl && (
+                <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
+                  <p className="text-green-400 text-sm mb-1">Last Deployment:</p>
+                  <a
+                    href={cloudRunServiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 text-sm break-all underline"
+                  >
+                    {cloudRunServiceUrl}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCloudRunModal(false);
+                  setCloudRunBranchName("");
+                }}
+                disabled={isCloudRunDeploying}
+                className="flex-1 px-4 py-2 bg-gray-800 text-gray-400 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCloudRunDeploy}
+                disabled={!cloudRunBranchName.trim() || isCloudRunDeploying}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCloudRunDeploying ? "Deploying..." : "Deploy"}
               </button>
             </div>
           </div>
