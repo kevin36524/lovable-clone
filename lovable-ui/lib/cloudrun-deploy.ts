@@ -10,20 +10,40 @@ const REGION = 'us-central1';
 const SERVICE_ACCOUNT = 'calproxy-service-account@twiliotest-8d802.iam.gserviceaccount.com';
 const REPO_OWNER = 'kevin36524';
 const REPO_NAME = 'hack-skeleton-app';
-const GITHUB_REPO_CONNECTION = 'github_kevin36524_hack-skeleton-app';
 
 /**
  * Sanitize branch name for use as Cloud Run service name
- * - Replaces "/" with "_"
- * - Converts to lowercase
- * - Validates format
+ * Cloud Run requirements:
+ * - Only lowercase letters, digits, and hyphens
+ * - Must begin with a letter
+ * - Cannot end with a hyphen
+ * - Must be less than 50 characters
  */
 export function sanitizeServiceName(branchName: string): string {
   if (!BRANCH_NAME_REGEX.test(branchName)) {
     throw new Error("Invalid branch name format. Only alphanumeric, hyphens, slashes, and underscores are allowed.");
   }
 
-  return branchName.replace(/\//g, "_").toLowerCase();
+  // Convert to lowercase and replace invalid characters with hyphens
+  let sanitized = branchName
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-') // Replace any non-alphanumeric (except hyphen) with hyphen
+    .replace(/-+/g, '-'); // Replace multiple consecutive hyphens with single hyphen
+
+  // Ensure it starts with a letter
+  if (!/^[a-z]/.test(sanitized)) {
+    sanitized = 'app-' + sanitized;
+  }
+
+  // Remove trailing hyphens
+  sanitized = sanitized.replace(/-+$/, '');
+
+  // Truncate to 50 characters
+  if (sanitized.length > 50) {
+    sanitized = sanitized.substring(0, 50).replace(/-+$/, '');
+  }
+
+  return sanitized;
 }
 
 /**
@@ -40,7 +60,8 @@ export function buildEnvVarObject(): Record<string, string> {
   const keys = [
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'GOOGLE_GENERATIVE_AI_API_KEY'
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'ELEVENLABS_API_KEY'
   ];
 
   const envVars: Record<string, string> = {};
@@ -167,32 +188,37 @@ export async function deployToCloudRunSDK(
       }
     }
 
-    // Build the base service configuration
-    const baseServiceConfig = {
-      template: {
-        containers: [{
-          image: imageUri,
-          env: envVarsArray,
-        }],
-        serviceAccount: SERVICE_ACCOUNT,
-      },
-    };
-
     let operation;
     if (serviceExists) {
       // Update existing service - must include name field
+      onProgress('Updating service configuration...');
       [operation] = await runClient.updateService({
         service: {
           name: fullServiceName,
-          ...baseServiceConfig,
+          template: {
+            containers: [{
+              image: imageUri,
+              env: envVarsArray,
+            }],
+            serviceAccount: SERVICE_ACCOUNT,
+          },
         },
       });
     } else {
-      // Create new service - must NOT include name field
+      // Create new service - must NOT include name field in service object
+      onProgress('Creating new service...');
       [operation] = await runClient.createService({
         parent: parent,
         serviceId: serviceName,
-        service: baseServiceConfig,
+        service: {
+          template: {
+            containers: [{
+              image: imageUri,
+              env: envVarsArray,
+            }],
+            serviceAccount: SERVICE_ACCOUNT,
+          },
+        },
       });
     }
 
@@ -201,19 +227,26 @@ export async function deployToCloudRunSDK(
     // Wait for deployment to complete
     const [service] = await operation.promise();
 
+    onProgress('Deployment completed, configuring public access...');
+
     // Make service publicly accessible
-    onProgress('Configuring service to allow unauthenticated access...');
-    await runClient.setIamPolicy({
-      resource: fullServiceName,
-      policy: {
-        bindings: [
-          {
-            role: 'roles/run.invoker',
-            members: ['allUsers'],
-          },
-        ],
-      },
-    });
+    try {
+      await runClient.setIamPolicy({
+        resource: fullServiceName,
+        policy: {
+          bindings: [
+            {
+              role: 'roles/run.invoker',
+              members: ['allUsers'],
+            },
+          ],
+        },
+      });
+      onProgress('Public access configured');
+    } catch (iamError: any) {
+      onProgress(`Warning: Failed to set public access: ${iamError.message}`);
+      // Don't fail the deployment if IAM policy fails
+    }
 
     const serviceUrl = service.uri || '';
 

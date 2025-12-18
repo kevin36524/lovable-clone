@@ -15,9 +15,9 @@ export default function Home() {
   });
   const [selectedBaseTemplate, setSelectedBaseTemplate] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("lastSelectedBaseTemplate") || "blank-app";
+      return localStorage.getItem("lastSelectedBaseTemplate") || "app-with-mastra";
     }
-    return "blank-app";
+    return "app-with-mastra";
   });
 
   const handleTemplateSelection = (templateName: string, gitBranch?: string) => {
@@ -75,22 +75,6 @@ export default function Home() {
           {/* Template Selection Buttons */}
           <div className="relative max-w-4xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Blank App */}
-              <button
-                onClick={() => handleTemplateSelection('blank-app')}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10"
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Blank App</h3>
-                  <p className="text-gray-400 text-sm">Start with a clean Next.js application</p>
-                </div>
-              </button>
-
               {/* App with Mastra */}
               <button
                 onClick={() => handleTemplateSelection('app-with-mastra')}
@@ -159,7 +143,6 @@ export default function Home() {
                   onChange={(e) => setSelectedBaseTemplate(e.target.value)}
                   className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-600"
                 >
-                  <option value="blank-app">Blank App</option>
                   <option value="app-with-mastra">App With Mastra</option>
                   <option value="app-with-mail-mastra">App with Mail and Mastra</option>
                 </select>
