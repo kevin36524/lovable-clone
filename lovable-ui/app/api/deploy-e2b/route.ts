@@ -47,6 +47,18 @@ export async function POST(req: NextRequest) {
           if (sandboxMatch) {
             sandboxId = sandboxMatch[1];
             originalLog("[API] Extracted Sandbox ID:", sandboxId);
+
+            // Send sandbox ID immediately so kill button can be enabled
+            try {
+              writer.write(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: "sandbox_created",
+                  sandboxId
+                })}\n\n`)
+              );
+            } catch (e) {
+              // Stream is closed, ignore
+            }
           }
 
           // Extract preview URL - look for Application URL

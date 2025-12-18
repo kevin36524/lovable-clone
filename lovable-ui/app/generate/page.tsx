@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import GenerateNavbar from "@/components/GenerateNavbar";
 
 interface Message {
-  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete" | "session_id" | "request_id";
+  type: "claude_message" | "tool_use" | "tool_result" | "progress" | "error" | "complete" | "session_id" | "request_id" | "sandbox_created";
   content?: string;
   name?: string;
   input?: any;
@@ -92,7 +92,24 @@ function GeneratePageContent() {
       }
     }
   }, [sandboxId]);
-  
+
+  // Warn user before closing tab if sandbox is running
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (sandboxId) {
+        e.preventDefault();
+        e.returnValue = 'You have a running sandbox. Please kill your sandbox and save your work to git before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sandboxId]);
+
   useEffect(() => {
     // Check if we have template info
     if (!templateName) {
@@ -154,6 +171,9 @@ function GeneratePageContent() {
 
               if (message.type === "error") {
                 throw new Error(message.message);
+              } else if (message.type === "sandbox_created") {
+                // Set sandbox ID immediately when sandbox is created
+                setSandboxId(message.sandboxId || null);
               } else if (message.type === "complete") {
                 setPreviewUrl(message.previewUrl || null);
                 setSandboxId(message.sandboxId || null);
