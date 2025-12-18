@@ -49,9 +49,12 @@ function GeneratePageContent() {
   const [cloudRunBranchName, setCloudRunBranchName] = useState("");
   const [isCloudRunDeploying, setIsCloudRunDeploying] = useState(false);
   const [cloudRunServiceUrl, setCloudRunServiceUrl] = useState<string | null>(null);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
+  const timeoutWarningShownRef = useRef(false);
+  const sandboxCreationTimeRef = useRef<number | null>(null);
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -60,6 +63,30 @@ function GeneratePageContent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Timeout warning effect - shows alert 5 minutes before 20-minute timeout
+  useEffect(() => {
+    if (sandboxId && !timeoutWarningShownRef.current) {
+      // Record the sandbox creation time
+      if (!sandboxCreationTimeRef.current) {
+        sandboxCreationTimeRef.current = Date.now();
+      }
+
+      // Set timeout to show warning at 15 minutes (5 minutes before 20-minute expiry)
+      const warningTime = 15 * 60 * 1000; // 15 minutes in milliseconds
+      const timeElapsed = Date.now() - sandboxCreationTimeRef.current;
+      const timeUntilWarning = warningTime - timeElapsed;
+
+      if (timeUntilWarning > 0) {
+        const warningTimer = setTimeout(() => {
+          setShowTimeoutWarning(true);
+          timeoutWarningShownRef.current = true;
+        }, timeUntilWarning);
+
+        return () => clearTimeout(warningTimer);
+      }
+    }
+  }, [sandboxId]);
   
   useEffect(() => {
     // Check if we have template info
@@ -806,6 +833,49 @@ function GeneratePageContent() {
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCloudRunDeploying ? "Deploying..." : "Deploy"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Timeout Warning Modal */}
+      {showTimeoutWarning && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-orange-900/90 to-red-900/90 rounded-lg p-6 w-[500px] border-2 border-orange-500 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-pulse">
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-white text-xl font-bold">Sandbox Expiring Soon!</h3>
+            </div>
+
+            <div className="bg-black/30 rounded-lg p-4 mb-4">
+              <p className="text-white text-base mb-3">
+                Your sandbox will expire in approximately <span className="font-bold text-orange-300">5 minutes</span>.
+              </p>
+              <p className="text-orange-200 text-sm">
+                Please save your work to Git now to avoid losing your changes!
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowTimeoutWarning(false)}
+                className="flex-1 px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+              >
+                Remind Me Later
+              </button>
+              <button
+                onClick={() => {
+                  setShowTimeoutWarning(false);
+                  setShowGitModal(true);
+                }}
+                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-bold shadow-lg"
+              >
+                Save to Git Now
               </button>
             </div>
           </div>

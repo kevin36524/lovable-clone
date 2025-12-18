@@ -47,7 +47,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 
   const sandbox = await Sandbox.create(templateName, {
     apiKey: process.env.E2B_API_KEY,
-    timeoutMs: 600_000 // 10 minutes
+    timeoutMs: 1_200_000 // 20 minutes
   })
 
   try {
@@ -187,7 +187,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     onLog('\n📱 Application:  ', devHealth.url)
     onLog('🆔 Sandbox ID:   ', sandbox.sandboxId)
     onLog('📋 Template:     ', templateName)
-    onLog('\n💡 Tip: Sandbox will auto-terminate after 1 hour (hobby tier)')
+    onLog('\n💡 Tip: Sandbox will auto-terminate after 20 minutes. Save to git regularly!')
     onLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
     return {
