@@ -45,6 +45,11 @@ function GeneratePageContent() {
   });
   const [gitCommitMessage, setGitCommitMessage] = useState("");
   const [isGitSaving, setIsGitSaving] = useState(false);
+  const [lastSavedBranch, setLastSavedBranch] = useState<string>(() => {
+    // Initialize with gitBranch from URL if available
+    const urlGitBranch = searchParams.get("gitBranch");
+    return urlGitBranch || "";
+  });
   const [showCloudRunModal, setShowCloudRunModal] = useState(false);
   const [cloudRunBranchName, setCloudRunBranchName] = useState("");
   const [isCloudRunDeploying, setIsCloudRunDeploying] = useState(false);
@@ -279,6 +284,9 @@ function GeneratePageContent() {
         localStorage.setItem("lastGitBranchName", gitBranchName.trim());
       }
 
+      // Save the full branch name for Cloud Run deployment
+      setLastSavedBranch(branchWithPrefix);
+
       // Close modal and reset commit message only
       setShowGitModal(false);
       setGitCommitMessage("");
@@ -374,7 +382,7 @@ function GeneratePageContent() {
   };
 
   const handleQuerySubmit = async () => {
-    if (!userQuery.trim() || !sandboxId || isQueryProcessing) return;
+    if (!userQuery.trim() || !sandboxId || !previewUrl || isQueryProcessing) return;
 
     setIsQueryProcessing(true);
     const query = userQuery;
@@ -620,7 +628,13 @@ function GeneratePageContent() {
                 Save to Git
               </button>
               <button
-                onClick={() => setShowCloudRunModal(true)}
+                onClick={() => {
+                  // Pre-populate with last saved branch if available
+                  if (lastSavedBranch) {
+                    setCloudRunBranchName(lastSavedBranch);
+                  }
+                  setShowCloudRunModal(true);
+                }}
                 disabled={!sandboxId}
                 className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-700 text-white hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={sandboxId ? "Deploy to Cloud Run" : "Waiting for sandbox"}
@@ -634,7 +648,7 @@ function GeneratePageContent() {
                 type="text"
                 placeholder={
                   !previewUrl
-                    ? "Waiting for sandbox..."
+                    ? "Preparing your query (sandbox is booting)..."
                     : commandMode === "ai"
                     ? "Ask Claude to modify your app..."
                     : "Enter shell command (e.g., ls, npm run dev)..."
@@ -642,13 +656,13 @@ function GeneratePageContent() {
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && previewUrl && userQuery.trim()) {
                     e.preventDefault();
                     handleQuerySubmit();
                   }
                 }}
                 className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg border border-gray-800 focus:outline-none focus:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!previewUrl || isQueryProcessing}
+                disabled={isQueryProcessing}
               />
               {isQueryProcessing && currentRequestId ? (
                 <button
@@ -663,6 +677,7 @@ function GeneratePageContent() {
                   onClick={handleQuerySubmit}
                   disabled={!previewUrl || !userQuery.trim() || isQueryProcessing}
                   className="p-2 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title={!previewUrl ? "Waiting for sandbox to be ready..." : "Submit query"}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
