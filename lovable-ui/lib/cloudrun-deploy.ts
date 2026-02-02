@@ -61,7 +61,8 @@ export function buildEnvVarObject(): Record<string, string> {
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'GOOGLE_GENERATIVE_AI_API_KEY',
-    'ELEVENLABS_API_KEY'
+    'ELEVENLABS_API_KEY',
+    'OPENAI_API_KEY'
   ];
 
   const envVars: Record<string, string> = {};
