@@ -32,7 +32,7 @@ function GeneratePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
   const [isQueryProcessing, setIsQueryProcessing] = useState(false);
-  const [commandMode, setCommandMode] = useState<"shell" | "ai">("ai");
+
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [showMastra, setShowMastra] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -55,6 +55,7 @@ function GeneratePageContent() {
   const [isCloudRunDeploying, setIsCloudRunDeploying] = useState(false);
   const [cloudRunServiceUrl, setCloudRunServiceUrl] = useState<string | null>(null);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [sidebarSection, setSidebarSection] = useState<"claude" | "kimi">("claude");
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
@@ -418,10 +419,8 @@ function GeneratePageContent() {
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
 
-      // Use the selected command mode
-      // Include sessionId only for AI commands
-      const requestBody: any = { sandboxId, commandType: commandMode, query };
-      if (commandMode === "ai" && sessionId) {
+      const requestBody: any = { sandboxId, commandType: "ai", query };
+      if (sessionId) {
         requestBody.sessionId = sessionId;
       }
 
@@ -537,6 +536,13 @@ function GeneratePageContent() {
         previewUrl={previewUrl}
         showMastra={showMastra}
         onToggleMastra={() => setShowMastra(!showMastra)}
+        onShowGitModal={() => setShowGitModal(true)}
+        onShowCloudRunModal={() => {
+          if (lastSavedBranch) {
+            setCloudRunBranchName(lastSavedBranch);
+          }
+          setShowCloudRunModal(true);
+        }}
       />
       {/* Spacer for navbar */}
       <div className="h-16" />
@@ -544,6 +550,34 @@ function GeneratePageContent() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left side - Chat */}
         <div className="w-[30%] flex flex-col border-r border-gray-800">
+          {/* Section Switcher */}
+          <div className="p-4 border-b border-gray-800">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSidebarSection("claude")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  sidebarSection === "claude"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                Claude
+              </button>
+              <button
+                onClick={() => setSidebarSection("kimi")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  sidebarSection === "kimi"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                Kimi
+              </button>
+            </div>
+          </div>
+
+          {sidebarSection === "claude" ? (
+            <>
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-white font-semibold">Hackable</h2>
@@ -609,28 +643,8 @@ function GeneratePageContent() {
           
           {/* Bottom input area */}
           <div className="p-4 border-t border-gray-800">
-            {/* Mode switcher */}
+            {/* Action buttons */}
             <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setCommandMode("ai")}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  commandMode === "ai"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
-              >
-                AI Mode
-              </button>
-              <button
-                onClick={() => setCommandMode("shell")}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  commandMode === "shell"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
-              >
-                Shell Mode
-              </button>
               <button
                 onClick={clearSessionId}
                 disabled={!sessionId}
@@ -638,28 +652,6 @@ function GeneratePageContent() {
                 title={sessionId ? "Clear AI session and start fresh" : "No active session"}
               >
                 Clear AI Session
-              </button>
-              <button
-                onClick={() => setShowGitModal(true)}
-                disabled={!sandboxId}
-                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-gray-400 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={sandboxId ? "Save changes to git" : "Waiting for sandbox"}
-              >
-                Save to Git
-              </button>
-              <button
-                onClick={() => {
-                  // Pre-populate with last saved branch if available
-                  if (lastSavedBranch) {
-                    setCloudRunBranchName(lastSavedBranch);
-                  }
-                  setShowCloudRunModal(true);
-                }}
-                disabled={!sandboxId}
-                className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-700 text-white hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={sandboxId ? "Deploy to Cloud Run" : "Waiting for sandbox"}
-              >
-                Deploy to Cloud Run
               </button>
             </div>
 
@@ -669,9 +661,7 @@ function GeneratePageContent() {
                 placeholder={
                   !previewUrl
                     ? "Preparing your query (sandbox is booting)..."
-                    : commandMode === "ai"
-                    ? "Ask Claude to modify your app..."
-                    : "Enter shell command (e.g., ls, npm run dev)..."
+                    : "Ask Claude to modify your app..."
                 }
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
@@ -706,6 +696,22 @@ function GeneratePageContent() {
               )}
             </div>
           </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0">
+              {previewUrl ? (
+                <iframe
+                  src={previewUrl.replace(/3000-/, "5494-")}
+                  className="w-full h-full"
+                  title="Kimi Sandbox"
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-gray-400 text-sm">Sandbox is not ready yet...</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Right side - Preview */}

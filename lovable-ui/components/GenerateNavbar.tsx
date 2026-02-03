@@ -9,13 +9,17 @@ interface GenerateNavbarProps {
   previewUrl: string | null;
   showMastra: boolean;
   onToggleMastra: () => void;
+  onShowGitModal: () => void;
+  onShowCloudRunModal: () => void;
 }
 
 export default function GenerateNavbar({
   sandboxId,
   previewUrl,
   showMastra,
-  onToggleMastra
+  onToggleMastra,
+  onShowGitModal,
+  onShowCloudRunModal
 }: GenerateNavbarProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -89,6 +93,22 @@ export default function GenerateNavbar({
             <span className="hidden md:inline">{user.name}</span>
           </div>
         )}
+
+        <button
+          onClick={onShowGitModal}
+          disabled={!sandboxId}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Save to Git
+        </button>
+
+        <button
+          onClick={onShowCloudRunModal}
+          disabled={!sandboxId}
+          className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Deploy to Cloud Run
+        </button>
 
         <button
           onClick={handleKillSandbox}

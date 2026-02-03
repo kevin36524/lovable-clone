@@ -125,6 +125,15 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       }
     )
 
+    // Start Kimi Web
+    onLog('⚙️  Starting Kimi web server on port 5494...')
+    await sandbox.commands.run(
+      `export KIMI_API_KEY=${process.env.KIMI_API_KEY}; cd /home/user/app && nohup kimi web > /tmp/kimi_web.log 2>&1 &`,
+      {
+        background: true
+      }
+    )
+
     // Health check function
     const healthCheck = async (
       port: number,
