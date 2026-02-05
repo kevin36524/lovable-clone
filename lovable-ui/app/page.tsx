@@ -15,9 +15,9 @@ export default function Home() {
   });
   const [selectedBaseTemplate, setSelectedBaseTemplate] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("lastSelectedBaseTemplate") || "app-with-mastra";
+      return localStorage.getItem("lastSelectedBaseTemplate") || "app-with-uds-mail-mastra";
     }
-    return "app-with-mastra";
+    return "app-with-uds-mail-mastra";
   });
 
   const handleTemplateSelection = (templateName: string, gitBranch?: string) => {
@@ -107,6 +107,22 @@ export default function Home() {
                 </div>
               </button>
 
+              {/* App with UDS Mail */}
+              <button
+                onClick={() => handleTemplateSelection('app-with-uds-mail-mastra')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">App with UDS Mail</h3>
+                  <p className="text-gray-400 text-sm">UDS Mail integration with Mastra</p>
+                </div>
+              </button>
+
               {/* From Git Branch */}
               <button
                 onClick={() => setShowGitBranchModal(true)}
@@ -145,6 +161,7 @@ export default function Home() {
                 >
                   <option value="app-with-mastra">App With Mastra</option>
                   <option value="app-with-mail-mastra">App with Mail and Mastra</option>
+                  <option value="app-with-uds-mail-mastra">App with UDS Mail</option>
                 </select>
               </div>
 
