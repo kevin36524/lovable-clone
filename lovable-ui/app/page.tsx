@@ -123,6 +123,22 @@ export default function Home() {
                 </div>
               </button>
 
+              {/* App with Gmail */}
+              <button
+                onClick={() => handleTemplateSelection('app-with-gmail-mastra')}
+                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-red-600/30 transition-colors">
+                    <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">App with Gmail</h3>
+                  <p className="text-gray-400 text-sm">Gmail integration with Mastra</p>
+                </div>
+              </button>
+
               {/* From Git Branch */}
               <button
                 onClick={() => setShowGitBranchModal(true)}
@@ -162,6 +178,7 @@ export default function Home() {
                   <option value="app-with-mastra">App With Mastra</option>
                   <option value="app-with-mail-mastra">App with Mail and Mastra</option>
                   <option value="app-with-uds-mail-mastra">App with UDS Mail</option>
+                  <option value="app-with-gmail-mastra">App with Gmail</option>
                 </select>
               </div>
 

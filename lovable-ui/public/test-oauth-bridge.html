@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OAuth Bridge Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      padding: 3rem;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .result-container {
+      background: #f7f7f7;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      display: none;
+    }
+
+    .result-container.visible {
+      display: block;
+    }
+
+    .result-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      border-radius: 4px;
+    }
+
+    .info-box p {
+      margin: 0;
+      color: #0d47a1;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 OAuth Bridge Test</h1>
+    <p>Test the sandbox OAuth bridge for Gmail and Calendar authentication</p>
+
+    <div class="info-box">
+      <p><strong>Instructions:</strong> Click "Connect Gmail" to test the OAuth flow. You'll be redirected to Google to authenticate, then back here with your tokens.</p>
+    </div>
+
+    <div class="button-group">
+      <button onclick="startOAuth()">Connect Gmail</button>
+      <button onclick="testRefresh()" id="refreshBtn" disabled>Test Token Refresh</button>
+      <button onclick="testValidate()" id="validateBtn" disabled>Test Token Validation</button>
+      <button onclick="testHealth()">Test Health Check</button>
+      <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div id="resultContainer" class="result-container">
+      <div class="result-title">Result:</div>
+      <div id="status"></div>
+      <pre id="result"></pre>
+    </div>
+  </div>
+
+  <script>
+    let currentTokens = null;
+
+    function showResult(data, isError = false) {
+      const container = document.getElementById('resultContainer');
+      const status = document.getElementById('status');
+      const result = document.getElementById('result');
+
+      container.classList.add('visible');
+      status.className = `status ${isError ? 'error' : 'success'}`;
+      status.textContent = isError ? 'Error' : 'Success';
+      result.textContent = JSON.stringify(data, null, 2);
+
+      // Enable test buttons if we have tokens
+      if (!isError && data.access_token) {
+        currentTokens = data;
+        document.getElementById('refreshBtn').disabled = !data.refresh_token;
+        document.getElementById('validateBtn').disabled = false;
+      }
+    }
+
+    function clearResults() {
+      document.getElementById('resultContainer').classList.remove('visible');
+      document.getElementById('result').textContent = '';
+      document.getElementById('status').textContent = '';
+
+      // Clear URL hash
+      if (window.location.hash) {
+        history.replaceState(null, null, ' ');
+      }
+    }
+
+    function startOAuth() {
+      // Get current URL without hash as returnUrl
+      const returnUrl = window.location.origin + window.location.pathname;
+
+      // Navigate to OAuth start endpoint in same window
+      window.location.href = `/api/auth/sandbox/start?returnUrl=${encodeURIComponent(returnUrl)}`;
+    }
+
+    // Check for tokens in URL hash on page load
+    function checkForTokens() {
+      const hash = window.location.hash;
+
+      if (hash && hash.startsWith('#oauth_')) {
+        try {
+          // Extract and decode token data from hash
+          const encodedData = hash.substring(7); // Remove '#oauth_'
+          const tokenData = JSON.parse(decodeURIComponent(encodedData));
+
+          if (tokenData.error) {
+            showResult({ error: tokenData.error }, true);
+          } else {
+            showResult(tokenData, false);
+          }
+
+          // Clear hash from URL
+          history.replaceState(null, null, ' ');
+        } catch (error) {
+          console.error('Failed to parse token data from URL hash:', error);
+        }
+      }
+    }
+
+    // Check for tokens on page load
+    window.addEventListener('load', checkForTokens);
+
+    async function testRefresh() {
+      if (!currentTokens || !currentTokens.refresh_token) {
+        showResult({ error: 'No refresh token available. Complete OAuth flow first.' }, true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/token/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            refresh_token: currentTokens.refresh_token,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Update current tokens
+          currentTokens.access_token = data.access_token;
+          currentTokens.expires_in = data.expires_in;
+          if (data.refresh_token) {
+            currentTokens.refresh_token = data.refresh_token;
+          }
+          showResult(data, false);
+        } else {
+          showResult(data, true);
+        }
+      } catch (error) {
+        showResult({ error: error.message }, true);
+      }
+    }
+
+    async function testValidate() {
+      if (!currentTokens || !currentTokens.access_token) {
+        showResult({ error: 'No access token available. Complete OAuth flow first.' }, true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/token/validate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            access_token: currentTokens.access_token,
+          }),
+        });
+
+        const data = await response.json();
+        showResult(data, !data.valid);
+      } catch (error) {
+        showResult({ error: error.message }, true);
+      }
+    }
+
+    async function testHealth() {
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        showResult(data, false);
+      } catch (error) {
+        showResult({ error: error.message }, true);
+      }
+    }
+  </script>
+</body>
+</html>
