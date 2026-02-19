@@ -47,7 +47,7 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
 
   const sandbox = await Sandbox.create(templateName, {
     apiKey: process.env.E2B_API_KEY,
-    timeoutMs: 1_200_000 // 20 minutes
+    timeoutMs: 1_800_000 // 30 minutes
   })
 
   try {
@@ -120,6 +120,13 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     onLog('⚙️  Starting Mastra dev server on port 4111...')
     await sandbox.commands.run(
       'cd /home/user/app && nohup pnpm run mastraDev > /tmp/mastra.log 2>&1 &',
+      {
+        background: true
+      }
+    )
+
+    await sandbox.commands.run(
+      'cd /home/user/app && sleep 5; node scripts/patch-studio.mjs',
       {
         background: true
       }
