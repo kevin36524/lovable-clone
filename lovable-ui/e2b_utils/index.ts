@@ -125,13 +125,6 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       }
     )
 
-    await sandbox.commands.run(
-      'cd /home/user/app && sleep 5; node scripts/patch-studio.mjs',
-      {
-        background: true
-      }
-    )
-
     // Start Kimi Web
     onLog('⚙️  Starting Kimi web server on port 5494...')
     await sandbox.commands.run(
@@ -205,6 +198,16 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
     onLog('📋 Template:     ', templateName)
     onLog('\n💡 Tip: Sandbox will auto-terminate after 20 minutes. Save to git regularly!')
     onLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+
+
+    onLog('⚙️  Patching Mastra studio...')
+    const patchResult = await sandbox.commands.run(
+      'cd /home/user/app && sleep 5; node scripts/patch-studio.mjs',
+      {
+        background: true
+      }
+    )
+    onLog('✅ Mastra studio patched with result: ', patchResult.stdout)
 
     return {
       sandbox,
