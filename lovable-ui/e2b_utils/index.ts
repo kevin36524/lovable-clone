@@ -107,12 +107,6 @@ export async function deployTemplateInSandbox(config: DeploymentConfig): Promise
       onLog(`✅ Switched to branch: ${gitBranch}`)
     }
 
-    // Install dependencies (must complete before starting servers)
-    onLog('\n🌐 Installing dependencies...')
-    await sandbox.commands.run(
-      'cd /home/user/app && CI=true pnpm install'
-    )
-
     // Start Next.js
     onLog('\n🌐 Starting Next.js server on port 3000...')
     await sandbox.commands.run(
