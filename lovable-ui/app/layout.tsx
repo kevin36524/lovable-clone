@@ -6,7 +6,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hackable - AI-Powered Code Generation",
+  title: "Vibatic - AI-Powered Code Generation",
   description: "Build applications faster with AI-powered code generation",
 };
 

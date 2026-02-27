@@ -62,7 +62,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Hero Section */}
           <h1 className="text-4xl sm:text-4xl md:text-4xl font-bold text-white mb-6">
-            Build something with Hackable
+            Build something with Vibatic
           </h1>
           <h3 className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
             Build with ❤️ by X-Team

@@ -44,7 +44,7 @@ function LoginContent() {
           <div className="flex justify-center mb-8">
             <div className="flex items-center gap-2 text-2xl font-semibold text-white">
               <span className="inline-block w-8 h-8 rounded-sm bg-gradient-to-br from-orange-400 via-pink-500 to-blue-500" />
-              Hackable
+              Vibatic
             </div>
           </div>
 
@@ -53,7 +53,7 @@ function LoginContent() {
             Welcome back
           </h1>
           <p className="text-gray-400 text-center mb-8">
-            Sign in to continue to Hackable
+            Sign in to continue to Vibatic
           </p>
 
           {/* Error message */}
@@ -150,7 +150,7 @@ function LoginContent() {
         {/* Additional info */}
         <p className="text-gray-600 text-sm text-center mt-6">
           Don&apos;t have access?{' '}
-          <a href="mailto:support@hackable.com" className="text-blue-400 hover:text-blue-300">
+          <a href="mailto:support@vibatic.com" className="text-blue-400 hover:text-blue-300">
             Contact support
           </a>
         </p>

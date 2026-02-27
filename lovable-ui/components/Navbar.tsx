@@ -18,7 +18,7 @@ export default function Navbar() {
         >
           {/* Simple gradient square logo */}
           <span className="inline-block w-6 h-6 rounded-sm bg-gradient-to-br from-orange-400 via-pink-500 to-blue-500" />
-          Hackable
+          Vibatic
         </a>
 
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-300">

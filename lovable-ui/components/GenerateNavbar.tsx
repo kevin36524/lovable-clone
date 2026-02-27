@@ -79,7 +79,7 @@ export default function GenerateNavbar({
         className="flex items-center gap-2 text-xl font-semibold text-white hover:opacity-90 transition-opacity"
       >
         <span className="inline-block w-6 h-6 rounded-sm bg-gradient-to-br from-orange-400 via-pink-500 to-blue-500" />
-        Hackable
+        Vibatic
       </a>
 
       {/* Action buttons */}
