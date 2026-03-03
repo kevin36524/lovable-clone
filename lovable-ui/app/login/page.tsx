@@ -66,7 +66,7 @@ function LoginContent() {
           {/* Disclaimer */}
           <div className="mb-6 p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
             <p className="text-amber-400 text-xs font-bold uppercase tracking-widest mb-3">
-              Important Notice — Pending Paranoid Approval
+              Important Notice
             </p>
             <div className="space-y-2 text-gray-300 text-xs font-semibold leading-relaxed">
               <p>
