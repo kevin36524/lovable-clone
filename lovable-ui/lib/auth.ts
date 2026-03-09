@@ -41,13 +41,23 @@ export async function verifySessionToken(token: string): Promise<User | null> {
 
 export function validateEmailDomain(email: string): boolean {
   const allowedDomains = process.env.ALLOWED_EMAIL_DOMAINS;
+  const allowedEmails = process.env.ALLOWED_EMAILS;
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  if (allowedEmails) {
+    const emails = allowedEmails.split(',').map(e => e.toLowerCase().trim());
+    if (emails.includes(normalizedEmail)) {
+      return true;
+    }
+  }
 
   if (!allowedDomains) {
     console.warn('ALLOWED_EMAIL_DOMAINS not set, denying access');
     return false;
   }
 
-  const emailDomain = email.split('@')[1]?.toLowerCase().trim();
+  const emailDomain = normalizedEmail.split('@')[1];
   if (!emailDomain) {
     return false;
   }

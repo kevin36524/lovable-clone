@@ -58,100 +58,100 @@ export default function Home() {
       />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-col items-center justify-start pt-24 pb-8 min-h-screen px-4 sm:px-6 lg:px-8 sm:justify-center sm:pt-0">
         <div className="max-w-4xl mx-auto text-center">
           {/* Hero Section */}
-          <h1 className="text-4xl sm:text-4xl md:text-4xl font-bold text-white mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
             Build something with Vibatic
           </h1>
-          <h3 className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+          <h3 className="text-lg sm:text-xl text-gray-300 mb-6 sm:mb-12 max-w-2xl mx-auto">
             Build with ❤️ by X-Team
           </h3>
 
-          <p className="text-xl sm:text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-300 mb-8 sm:mb-12 max-w-2xl mx-auto">
             Choose a template to start building your application
           </p>
 
           {/* Template Selection Buttons */}
           <div className="relative max-w-4xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {/* App with Mastra */}
               <button
                 onClick={() => handleTemplateSelection('app-with-mastra')}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-blue-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">App with Mastra</h3>
-                  <p className="text-gray-400 text-sm">Next.js app with Mastra AI integration</p>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">App with Mastra</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Next.js app with Mastra AI integration</p>
                 </div>
               </button>
 
               {/* App with Mail and Mastra */}
               <button
                 onClick={() => handleTemplateSelection('app-with-mail-mastra')}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/10"
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/10"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-green-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-green-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-green-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">App with Mail & Mastra</h3>
-                  <p className="text-gray-400 text-sm">Full-featured app with email and AI</p>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">App with Mail & Mastra</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Full-featured app with email and AI</p>
                 </div>
               </button>
 
               {/* App with UDS Mail */}
               <button
                 onClick={() => handleTemplateSelection('app-with-uds-mail-mastra')}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10"
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-purple-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">App with UDS Mail</h3>
-                  <p className="text-gray-400 text-sm">UDS Mail integration with Mastra</p>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">App with UDS Mail</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">UDS Mail integration with Mastra</p>
                 </div>
               </button>
 
               {/* App with Gmail */}
               <button
                 onClick={() => handleTemplateSelection('app-with-gmail-mastra')}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10"
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-red-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-red-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">App with Gmail</h3>
-                  <p className="text-gray-400 text-sm">Gmail integration with Mastra</p>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">App with Gmail</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Gmail integration with Mastra</p>
                 </div>
               </button>
 
               {/* From Git Branch */}
               <button
                 onClick={() => setShowGitBranchModal(true)}
-                className="group relative p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/10"
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/10"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-orange-600/20 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-600/30 transition-colors">
-                    <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-orange-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-orange-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">From Git Branch</h3>
-                  <p className="text-gray-400 text-sm">Load from a specific Git branch</p>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">From Git Branch</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Load from a specific Git branch</p>
                 </div>
               </button>
             </div>
@@ -162,7 +162,7 @@ export default function Home() {
       {/* Git Branch Modal */}
       {showGitBranchModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+          <div className="bg-gray-900 rounded-lg p-6 w-[calc(100vw-2rem)] max-w-[500px] border border-gray-800">
             <h3 className="text-white text-lg font-semibold mb-4">Load from Git Branch</h3>
 
             <div className="space-y-4">
