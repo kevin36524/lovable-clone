@@ -35,6 +35,7 @@ function GeneratePageContent() {
 
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [showMastra, setShowMastra] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showGitModal, setShowGitModal] = useState(false);
   const [gitBranchName, setGitBranchName] = useState(() => {
@@ -543,13 +544,21 @@ function GeneratePageContent() {
           }
           setShowCloudRunModal(true);
         }}
+        sidebarSection={sidebarSection}
+        onToggleSidebarSection={() => setSidebarSection(s => s === "claude" ? "kimi" : "claude")}
+        onShowChat={() => setShowMobileChat(true)}
+        showMobileChat={showMobileChat}
+        onShowPreview={() => setShowMobileChat(false)}
       />
       {/* Spacer for navbar */}
       <div className="h-16" />
       
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left side - Chat */}
-        <div className="w-[30%] flex flex-col border-r border-gray-800">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left side - Chat (desktop: always visible 30%, mobile: full-screen when active) */}
+        <div className={`
+          md:relative md:w-[30%] md:flex md:flex-col md:border-r md:border-gray-800
+          ${showMobileChat ? "flex flex-col absolute inset-0 z-10 bg-gray-950" : "hidden md:flex md:flex-col"}
+        `}>
           {/* Section Switcher */}
           <div className="p-4 border-b border-gray-800">
             <div className="flex gap-2">
@@ -579,17 +588,29 @@ function GeneratePageContent() {
           {sidebarSection === "claude" ? (
             <>
           {/* Header */}
-          <div className="p-4 border-b border-gray-800">
-            <h2 className="text-white font-semibold">Hackable</h2>
-            <p className="text-gray-400 text-sm mt-1 break-words">
-              {templateName ? `Template: ${templateName}` : "Setting up..."}
-            </p>
-            {sessionId && (
-              <div className="flex items-center gap-2 mt-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <p className="text-green-400 text-xs">AI Session Active</p>
-              </div>
-            )}
+          <div className="p-4 border-b border-gray-800 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-white font-semibold">Hackable</h2>
+              <p className="text-gray-400 text-sm mt-1 break-words">
+                {templateName ? `Template: ${templateName}` : "Setting up..."}
+              </p>
+              {sessionId && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <p className="text-green-400 text-xs">AI Session Active</p>
+                </div>
+              )}
+            </div>
+            {/* Back to preview - mobile only */}
+            <button
+              className="md:hidden flex items-center gap-1 px-2 py-1 text-gray-400 hover:text-white text-xs rounded-lg hover:bg-gray-800 transition-colors flex-shrink-0"
+              onClick={() => setShowMobileChat(false)}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l-4 4 4 4" />
+              </svg>
+              Preview
+            </button>
           </div>
           
           {/* Messages */}
@@ -714,8 +735,8 @@ function GeneratePageContent() {
           )}
         </div>
         
-        {/* Right side - Preview */}
-        <div className="w-[70%] bg-gray-950 flex items-center justify-center">
+        {/* Right side - Preview (hidden on mobile when chat is open) */}
+        <div className={`flex-1 md:w-[70%] bg-gray-950 flex items-center justify-center relative ${showMobileChat ? "hidden md:flex" : "flex"}`}>
           {!displayUrl && isGenerating && (
             <div className="text-center">
               <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
@@ -745,7 +766,7 @@ function GeneratePageContent() {
       {/* Git Save Modal */}
       {showGitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+          <div className="bg-gray-900 rounded-lg p-6 w-[calc(100vw-2rem)] max-w-[500px] border border-gray-800">
             <h3 className="text-white text-lg font-semibold mb-4">Save to Git</h3>
 
             <div className="space-y-4">
@@ -810,7 +831,7 @@ function GeneratePageContent() {
       {/* Cloud Run Deploy Modal */}
       {showCloudRunModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 w-[500px] border border-gray-800">
+          <div className="bg-gray-900 rounded-lg p-6 w-[calc(100vw-2rem)] max-w-[500px] border border-gray-800">
             <h3 className="text-white text-lg font-semibold mb-4">Deploy to Cloud Run</h3>
 
             <div className="space-y-4">
@@ -883,7 +904,7 @@ function GeneratePageContent() {
       {/* Timeout Warning Modal */}
       {showTimeoutWarning && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-gradient-to-br from-orange-900/90 to-red-900/90 rounded-lg p-6 w-[500px] border-2 border-orange-500 shadow-2xl">
+          <div className="bg-gradient-to-br from-orange-900/90 to-red-900/90 rounded-lg p-6 w-[calc(100vw-2rem)] max-w-[500px] border-2 border-orange-500 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-pulse">
                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
