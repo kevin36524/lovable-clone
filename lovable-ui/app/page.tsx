@@ -139,6 +139,22 @@ export default function Home() {
                 </div>
               </button>
 
+              {/* App with Home */}
+              <button
+                onClick={() => handleTemplateSelection('app-with-yahoo-home-mastra')}
+                className="group relative p-4 sm:p-8 bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl hover:border-gray-600 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-yellow-600/30 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm sm:text-xl font-semibold text-white mb-1 sm:mb-2">App with Home</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Yahoo Home integration with Mastra</p>
+                </div>
+              </button>
+
               {/* From Git Branch */}
               <button
                 onClick={() => setShowGitBranchModal(true)}
@@ -179,6 +195,7 @@ export default function Home() {
                   <option value="app-with-mail-mastra">App with Mail and Mastra</option>
                   <option value="app-with-uds-mail-mastra">App with UDS Mail</option>
                   <option value="app-with-gmail-mastra">App with Gmail</option>
+                  <option value="app-with-yahoo-home-mastra">App with Home</option>
                 </select>
               </div>
 
